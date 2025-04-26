@@ -15,6 +15,29 @@ void ParticleSystem::update( float dt ) {
         }
     }
 
+    // Detect particle-particle collisions
+    const float collisionDistance = 0.1f; 
+
+    for (size_t i = 0; i < particles.size(); ++i)
+    {
+        for (size_t j = i + 1; j < particles.size(); ++j)
+        {
+            if (particles[ i ].isAlive() && particles[ j ].isAlive())
+            {
+                glm::vec3 delta = particles[ i ].position - particles[ j ].position;
+                float distance = glm::length( delta );
+
+                if (distance < collisionDistance)
+                {
+                    // Simple elastic collision: swap velocities
+                    glm::vec3 temp = particles[ i ].velocity;
+                    particles[ i ].velocity = particles[ j ].velocity;
+                    particles[ j ].velocity = temp;
+                }
+            }
+        }
+    }
+
     // Remove dead particles
     particles.erase(
         std::remove_if( particles.begin(), particles.end(), []( const Particle &p ) {

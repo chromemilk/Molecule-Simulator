@@ -132,6 +132,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\external\glad\glad.c" />
+    <ClCompile Include="Atom.cpp" />
+    <ClCompile Include="AtomSystem.cpp" />
+    <ClCompile Include="Bond.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="Molecule Simulator.cpp" />
@@ -139,20 +142,32 @@
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="ShaderLoader.cpp" />
+    <ClCompile Include="TextRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\external\glad\glad.h" />
     <ClInclude Include="..\external\KHR\khrplatform.h" />
+    <ClInclude Include="..\external\stb_easy_font.h" />
+    <ClInclude Include="Atom.h" />
+    <ClInclude Include="AtomSystem.h" />
+    <ClInclude Include="Bond.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="MathUtils.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="ShaderLoader.h" />
+    <ClInclude Include="TextRenderer.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="bond_fragment.glsl" />
+    <None Include="bond_vertex.glsl" />
     <None Include="particle_fragment.glsl" />
     <None Include="particle_vertex.glsl" />
+    <None Include="text.frag" />
+    <None Include="text.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

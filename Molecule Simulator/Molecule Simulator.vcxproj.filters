@@ -28,6 +28,9 @@
     <Filter Include="Source Files\particles">
       <UniqueIdentifier>{15ce6bb9-7805-468d-a0a9-5dd2fd038187}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\molecule">
+      <UniqueIdentifier>{cfa5e083-c745-40b6-a15c-f940a7c3fba8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Molecule Simulator.cpp">
@@ -52,6 +55,21 @@
       <Filter>Source Files\renderer</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
+      <Filter>Source Files\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Atom.cpp">
+      <Filter>Source Files\molecule</Filter>
+    </ClCompile>
+    <ClCompile Include="AtomSystem.cpp">
+      <Filter>Source Files\molecule</Filter>
+    </ClCompile>
+    <ClCompile Include="Bond.cpp">
+      <Filter>Source Files\molecule</Filter>
+    </ClCompile>
+    <ClCompile Include="TextRenderer.cpp">
+      <Filter>Source Files\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderLoader.cpp">
       <Filter>Source Files\renderer</Filter>
     </ClCompile>
   </ItemGroup>
@@ -80,12 +98,42 @@
     <ClInclude Include="Camera.h">
       <Filter>Source Files\renderer</Filter>
     </ClInclude>
+    <ClInclude Include="Atom.h">
+      <Filter>Source Files\molecule</Filter>
+    </ClInclude>
+    <ClInclude Include="AtomSystem.h">
+      <Filter>Source Files\molecule</Filter>
+    </ClInclude>
+    <ClInclude Include="Bond.h">
+      <Filter>Source Files\molecule</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\stb_easy_font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TextRenderer.h">
+      <Filter>Source Files\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderLoader.h">
+      <Filter>Source Files\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_vertex.glsl">
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="particle_fragment.glsl">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="bond_vertex.glsl">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="bond_fragment.glsl">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="text.vert">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="text.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>
