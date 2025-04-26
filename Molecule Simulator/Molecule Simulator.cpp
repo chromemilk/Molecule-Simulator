@@ -1,20 +1,41 @@
-// Molecule Simulator.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+#include "Renderer.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-#include <iostream>
+int main() {
+    // Init GLFW
+    if (!glfwInit()) return -1;
 
-int main()
-{
-    std::cout << "Hello World!\n";
+    GLFWwindow *window = glfwCreateWindow( 800, 600, "Particle Simulator", nullptr, nullptr );
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent( window );
+
+    // Init GLAD
+    if (!gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ))
+    {
+        return -1;
+    }
+
+    // Init Renderer
+    Renderer::Init();
+
+    while (!glfwWindowShouldClose( window ))
+    {
+        glClearColor( 0.1f, 0.1f, 0.1f, 1.0f );
+        glClear( GL_COLOR_BUFFER_BIT );
+
+        // Draw a particle
+        Renderer::DrawParticle( glm::vec3( 0.0f, 0.0f, 0.0f ), glm::vec3( 1.0f, 0.5f, 0.2f ), 10.0f );
+
+        glfwSwapBuffers( window );
+        glfwPollEvents();
+    }
+
+    Renderer::Shutdown();
+    glfwTerminate();
+    return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
