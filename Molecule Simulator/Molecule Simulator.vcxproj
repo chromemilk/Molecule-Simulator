@@ -132,15 +132,23 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\external\glad\glad.c" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="Molecule Simulator.cpp" />
+    <ClCompile Include="Particle.cpp" />
+    <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\external\glad\glad.h" />
     <ClInclude Include="..\external\KHR\khrplatform.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="MathUtils.h" />
+    <ClInclude Include="Particle.h" />
+    <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_fragment.glsl" />
