@@ -143,34 +143,6 @@ void AtomSystem::applyVSEPRForces( float dt ) {
     }
 }
 
-float AtomSystem::getIdealBondAngle( const Atom &atom ) {
-    int bonds = static_cast<int>(atom.bondedAtoms.size());
-
-    int valence =
-        (atom.type == "H") ? 1 :
-        (atom.type == "O") ? 6 :
-        (atom.type == "N") ? 5 :
-        (atom.type == "C") ? 4 : 4;   // default
-
-    int usedElectrons = bonds * 1;
-
-    int lonePairElectrons = valence - usedElectrons;
-    if (lonePairElectrons < 0) lonePairElectrons = 0;
-    int lonePairs = lonePairElectrons / 2;
-
-    int totalGroups = bonds + lonePairs;
-
-    if (totalGroups == 2) return 180.0f;                // linear
-    if (totalGroups == 3) return 120.0f;                // trig-planar
-    if (totalGroups == 4)
-    {                             
-        if (lonePairs == 0) return 109.5f;              
-        if (lonePairs == 1) return 107.0f;              
-        if (lonePairs == 2) return 104.5f;              
-    }
-    return 109.5f;
-}
-
 static int valenceFor( const std::string &t ) {
     if (t == "H") return 1;
     if (t == "O") return 6;
@@ -179,16 +151,61 @@ static int valenceFor( const std::string &t ) {
     return 4;
 }
 
+float AtomSystem::getIdealBondAngle( const Atom &atom ) {
+    int bondedGroups = 0;           // counts each neighbor once
+    int bondElectronPairs = 0;      // counts total electron pairs
+
+    for (auto &bond : bonds)
+    {
+        if (bond.atomA == &atom || bond.atomB == &atom)
+        {
+            bondedGroups += 1;
+            bondElectronPairs += bond.bondOrder();
+        }
+    }
+
+    int valence = valenceFor( atom.type );
+    int lonePairElectrons = std::max( 0, valence - bondElectronPairs );
+    int lonePairs = lonePairElectrons / 2;
+
+    int totalGroups = bondedGroups + lonePairs;  // VSEPR groups
+
+    if (totalGroups == 2) return 180.0f;          // linear
+    if (totalGroups == 3) return 120.0f;          // trigonal planar
+    if (totalGroups == 4)
+    {                       // tetrahedral family
+        if (lonePairs == 0) return 109.5f;        
+        if (lonePairs == 1) return 107.0f;       
+        if (lonePairs == 2) return 104.5f;        
+    }
+    // fallback
+    return 109.5f;
+}
+
+
+
+
 void AtomSystem::updateLonePairs() {
     for (auto &atom : atoms)
     {
-        int sigmaBonds = int( atom.bondedAtoms.size() );
+        int bondOrderSum = 0;
+        for (auto &bond : bonds)
+        {
+            if (bond.atomA == &atom || bond.atomB == &atom)
+            {
+                bondOrderSum += bond.bondOrder(); // bondOrder = 1, 2, or 3
+            }
+        }
+
         int valence = valenceFor( atom.type );
 
-        int lonePairElectrons = std::max( 0, valence - sigmaBonds );
-        atom.lonePairs = lonePairElectrons / 2;
+        int lonePairElectrons = std::max( 0, valence - bondOrderSum );
+        atom.lonePairs = lonePairElectrons / 2; // each lone pair = 2 electrons
     }
 }
+
+
+
 
 
 void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
@@ -220,7 +237,7 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
         }
     }
 
-    // Draw correction aggression once at top-left corner
+    // Draw correction aggression once at the top left corner
     std::string corrText = "Correction Aggression: " + std::to_string( latestCorrectionStrength );
     textRenderer.DrawScreenText( corrText, 10.0f, 30.0f, windowWidth, windowHeight );
 }
@@ -229,15 +246,14 @@ static std::vector<glm::vec3> tetrDirs{
     { 1, 1, 1}, {-1,-1, 1},
     { 1,-1,-1}, {-1, 1,-1}
 };
-
 void AtomSystem::computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
     out.clear();
 
     static const std::vector<glm::vec3> tetrahedralDirs = {
-        glm::normalize( glm::vec3( 1,  1,  1 ) ),
-        glm::normalize( glm::vec3( -1, -1,  1 ) ),
+        glm::normalize( glm::vec3( 1, 1, 1 ) ),
+        glm::normalize( glm::vec3( -1, -1, 1 ) ),
         glm::normalize( glm::vec3( 1, -1, -1 ) ),
-        glm::normalize( glm::vec3( -1,  1, -1 ) )
+        glm::normalize( glm::vec3( -1, 1, -1 ) )
     };
 
     for (auto &atom : atoms)
@@ -249,13 +265,13 @@ void AtomSystem::computeLonePairPositions( std::unordered_map<Atom *, std::vecto
 
         if (groups == 4)
         {
-            // --- Tetrahedral geometry ---
+            // tetrahedral
             std::vector<bool> used( 4, false );
-
             for (auto *neighbor : atom.bondedAtoms)
             {
                 glm::vec3 bondVec = glm::normalize( neighbor->position - atom.position );
-                float bestDot = -2.0f; int best = -1;
+                float bestDot = -2.0f;
+                int best = -1;
                 for (int i = 0; i < 4; ++i)
                 {
                     float dot = glm::dot( bondVec, tetrahedralDirs[ i ] );
@@ -274,37 +290,21 @@ void AtomSystem::computeLonePairPositions( std::unordered_map<Atom *, std::vecto
                 if (!used[ i ])
                 {
                     glm::vec3 dir = tetrahedralDirs[ i ];
-                    out[ &atom ].push_back( atom.position + dir * atom.radius * 1.5f );
+                    out[ &atom ].push_back( atom.position + dir * atom.radius * 1.8f );
+                    out[ &atom ].push_back( atom.position + dir * atom.radius * 2.2f ); // slightly offset second electron
                     --remaining;
                 }
             }
         }
-        else if (groups == 3)
-        {
-            // --- Trigonal planar geometry ---
-            glm::vec3 normal = glm::vec3( 0, 0, 1 );
-
-            out[ &atom ].push_back( atom.position + normal * atom.radius * 1.5f );
-            if (atom.lonePairs > 1)
-                out[ &atom ].push_back( atom.position - normal * atom.radius * 1.5f );
-        }
-        else if (groups == 2)
-        {
-            // --- Linear geometry ---
-            glm::vec3 up = glm::vec3( 0, 1, 0 );
-
-            out[ &atom ].push_back( atom.position + up * atom.radius * 1.5f );
-            if (atom.lonePairs > 1)
-                out[ &atom ].push_back( atom.position - up * atom.radius * 1.5f );
-        }
         else
         {
-            // fallback: spread evenly around atom
+            // fallback if not tetrahedral
             for (int i = 0; i < atom.lonePairs; ++i)
             {
                 float angle = i * glm::two_pi<float>() / atom.lonePairs;
                 glm::vec3 dir( cos( angle ), sin( angle ), 0 );
-                out[ &atom ].push_back( atom.position + dir * atom.radius * 1.5f );
+                out[ &atom ].push_back( atom.position + dir * atom.radius * 2.0f );
+                out[ &atom ].push_back( atom.position + dir * atom.radius * 2.2f );
             }
         }
     }

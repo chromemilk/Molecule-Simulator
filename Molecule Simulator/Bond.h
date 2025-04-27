@@ -2,13 +2,13 @@
 
 #include <glm/glm.hpp>
 
-class Atom; // Forward declaration to avoid circular include
+class Atom; // Forward declaration
 
 enum class BondType
 {
-    Single,
-    Double,
-    Triple
+    SINGLE = 1,
+    DOUBLE = 2,
+    TRIPLE = 3
 };
 
 class Bond
@@ -20,8 +20,12 @@ public:
     float stiffness;
     BondType type;
 
-    Bond( Atom *a, Atom *b, BondType bondType = BondType::Single );
+    Bond( Atom *a, Atom *b, BondType bondType = BondType::SINGLE );
 
     void applyForce();
     void render() const;
+
+    int bondOrder() const {
+        return static_cast<int>(type);
+    }
 };

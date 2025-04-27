@@ -20,7 +20,7 @@ public:
 
     void spawnAtom( const std::string &type );
     void addAtom( const Atom &atom );
-    void createBond( int indexA, int indexB, BondType bondType = BondType::Single );
+    void createBond( int indexA, int indexB, BondType bondType = BondType::SINGLE );
 
     void updateLonePairs(); // compute lone pairs
     void computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );

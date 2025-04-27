@@ -106,16 +106,22 @@ int main() {
     textRenderer.Init();
 
     // --- Molecule Setup ---
-    Atom oxygen( "O", glm::vec3( 0.0f, 0.0f, 0.0f ), 16.0f );
-    Atom hydrogen1( "H", glm::vec3( 0.9f, 0.6f, 0.0f ), 1.0f );
-    Atom hydrogen2( "H", glm::vec3( -0.9f, 0.6f, 0.0f ), 1.0f );
+	
+    atomSystem.spawnAtom("C");
+	atomSystem.spawnAtom( "O" );
+	atomSystem.spawnAtom( "O" );
+    
+	atomSystem.createBond( 0, 1, BondType::DOUBLE );
+	atomSystem.createBond( 0, 2, BondType::DOUBLE );
+    
 
-    atomSystem.addAtom( oxygen );
-    atomSystem.addAtom( hydrogen1 );
-    atomSystem.addAtom( hydrogen2 );
-
-    atomSystem.createBond( 0, 1 );
-    atomSystem.createBond( 0, 2 );
+    /*
+    atomSystem.spawnAtom( "O" );
+	atomSystem.spawnAtom( "H" );
+	atomSystem.spawnAtom( "H" );
+	atomSystem.createBond( 0, 1, BondType::SINGLE );
+	atomSystem.createBond( 0, 2, BondType::SINGLE );
+    */
 
     atomSystem.updateLonePairs(); 
 

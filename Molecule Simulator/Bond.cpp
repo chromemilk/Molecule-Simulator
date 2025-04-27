@@ -10,9 +10,9 @@ Bond::Bond( Atom *a, Atom *b, BondType type )
     : atomA( a ), atomB( b ), type( type ) {
 
     restLength = 1.0f;
-    stiffness = (type == BondType::Single) ? 5.0f :
-        (type == BondType::Double) ? 8.0f :
-        (type == BondType::Triple) ? 10.0f : 5.0f;
+    stiffness = (type == BondType::SINGLE) ? 5.0f :
+        (type == BondType::DOUBLE) ? 8.0f :
+        (type == BondType::TRIPLE) ? 10.0f : 5.0f;
 }
 
 void Bond::applyForce() {

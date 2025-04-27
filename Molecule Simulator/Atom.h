@@ -7,7 +7,7 @@
 class Atom
 {
 public:
-    std::string type;         // Atom type (H, O, C, N, etc.)
+    std::string type;         // Atom type
     float mass;               // Mass of the atom
     glm::vec3 position;       // 3D position
     glm::vec3 velocity;       // Current velocity
