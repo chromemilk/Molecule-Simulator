@@ -132,6 +132,11 @@ void AtomSystem::applyVSEPRForces( float dt ) {
 
                     latestCorrectionStrength = glm::length( correction ); 
 
+                    // Just clamp until I make some PID or something 
+                    if (glm::length( correction ) > 5.f)
+                    {
+						correction = glm::normalize( correction ) * 5.f; // cap the correction
+                    }
 
                     if (!neighborA->fixed)
                         neighborA->velocity += correction;

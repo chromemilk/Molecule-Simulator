@@ -27,7 +27,6 @@ float lastFrame = 0.0f;
 // Global window pointer
 GLFWwindow *window = nullptr;
 
-// Molecule system (pass the text renderer reference to AtomSystem)
 TextRenderer textRenderer;
 AtomSystem atomSystem( 100, textRenderer );
 
@@ -147,9 +146,11 @@ int main() {
         // Render 3D atoms and bonds
         atomSystem.render( SCR_WIDTH, SCR_HEIGHT );
 
-        // Render text (at the very end, after everything else)
-        // This could be modified or removed if you want to move labels to render dynamically
-        //textRenderer.DrawText( "H2O", glm::vec3( 0.0f, 0.0f, 0.0f ), SCR_WIDTH, SCR_HEIGHT );
+        textRenderer.DrawScreenText( "Compound: CO2", 10.0f, 50.0f, SCR_WIDTH, SCR_HEIGHT );
+        textRenderer.DrawScreenText( "Double Bonds: 2", 10.0f, 70.0f, SCR_WIDTH, SCR_HEIGHT );
+        textRenderer.DrawScreenText( "Expected Angle: 180", 10.0f, 90.0f, SCR_WIDTH, SCR_HEIGHT );
+        textRenderer.DrawScreenText( "Avg Program Error: 1", 10.0f, 110.0f, SCR_WIDTH, SCR_HEIGHT );
+
 
         glfwSwapBuffers( window );
         glfwPollEvents();
