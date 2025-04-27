@@ -71,6 +71,15 @@ void buildCO2( AtomSystem &sys ) {
     sys.createBond( 0, 2, BondType::DOUBLE );
 }
 
+void buildHCN( AtomSystem &sys ) {
+	sys.spawnAtom( "H" );               // 0
+	sys.spawnAtom( "C" );               // 1
+	sys.spawnAtom( "N" );               // 2
+	sys.createBond( 0, 1, BondType::SINGLE );
+	sys.createBond( 1, 2, BondType::TRIPLE );
+}
+
+
 int main() {
     glfwInit();
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
@@ -96,8 +105,11 @@ int main() {
     Renderer::Init( &camera );
     textRenderer.Init();
 
-    buildWater( atoms );
-    //buildCO2( atoms );        
+    //buildWater( atoms );
+    //buildCO2( atoms );
+	buildHCN( atoms );
+
+    atoms.updateLonePairs();
 
 
     while (!glfwWindowShouldClose( window ))
@@ -116,11 +128,8 @@ int main() {
         atoms.render( w, h );
 
         float mag = atoms.computeDipole();
-        atoms.updateLonePairs();
 
-
-
-        textRenderer.DrawScreenText( "Molecule(s): H2O", 10, 30, w, h );
+        textRenderer.DrawScreenText( "Molecule(s): HCN", 10, 30, w, h );
         textRenderer.DrawScreenText( std::string( "Polarity: " ) + (atoms.isPolar ? "Polar" : "Non-Polar") + "; " + "Magnitude: " + std::to_string(mag), 10, 50, w, h);
         textRenderer.DrawScreenText( "Correction Coef: " + std::to_string(atoms.latestCorrectionStrength), 10, 70, w, h );
 

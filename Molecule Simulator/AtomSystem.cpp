@@ -1,8 +1,10 @@
+#define GLM_ENABLE_EXPERIMENTAL
 #include "AtomSystem.h"
 #include "Renderer.h"
 #include "PeriodicTable.h"
 #include "MathUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
 #include <GLFW/glfw3.h>
 
@@ -210,88 +212,73 @@ void AtomSystem::computeLonePairPositions(
     std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
     out.clear();
 
-    /* universal tetrahedral directions (object-space unit vectors) */
-    static const glm::vec3 tetraDir[ 4 ] = {
+    static const glm::vec3 tetraDirs[ 4 ] = {
         glm::normalize( glm::vec3( 1,  1,  1 ) ),
         glm::normalize( glm::vec3( -1, -1,  1 ) ),
         glm::normalize( glm::vec3( 1, -1, -1 ) ),
         glm::normalize( glm::vec3( -1,  1, -1 ) )
     };
 
-    for (auto &atom : atoms)
+    const float centerOffset = 0.04f;        // how far above the sphere
+  
+    for (Atom &atom : atoms)
     {
-        if (atom.lonePairs == 0) continue;
+        int LP = atom.lonePairs;
+        if (LP <= 0) continue;
 
-        int bonded = (int)atom.bondedAtoms.size();
-        int groups = bonded + atom.lonePairs;
+        std::vector<glm::vec3> lpDirs;
+        int B = int( atom.bondedAtoms.size() );
+        int groups = B + LP;
 
         if (groups <= 3)
         {
-            glm::vec3 ref( 1, 0, 0 );
-            if (bonded > 0) ref = glm::normalize( atom.bondedAtoms[ 0 ]->position - atom.position );
-
-            glm::vec3 normal( 0, 0, 1 );                                      // default plane normal
-            if (bonded >= 2)
-                normal = glm::normalize( glm::cross(
-                    atom.bondedAtoms[ 0 ]->position - atom.position,
-                    atom.bondedAtoms[ 1 ]->position - atom.position ) );
-
-            for (int i = 0; i < atom.lonePairs; ++i)
+            for (int i = 0; i < LP; ++i)
             {
-                float ang = i * glm::two_pi<float>() / atom.lonePairs;
-                glm::vec3 dir = glm::normalize( glm::vec3(
-                    ref.x * cos( ang ) - ref.y * sin( ang ),
-                    ref.x * sin( ang ) + ref.y * cos( ang ),
-                    0.0f ) );
-
-                if (groups == 3 && atom.lonePairs == 1) dir = normal;          // trig-planar, single LP -> above plane
-                dir = glm::normalize( dir );
-                out[ &atom ].push_back( atom.position + dir * (atom.radius + 0.02f) );
+                float ang = i * glm::two_pi<float>() / LP;
+                lpDirs.emplace_back( cos( ang ), sin( ang ), 0.0f );
             }
-            continue;
         }
-
-        /* ------------------------------------------------ tetrahedral family (groups ==4) */
-        if (groups == 4)
+        else
         {
-            /* mark which tetra direction already occupied by bonds */
             bool used[ 4 ] = { false,false,false,false };
             for (Atom *nb : atom.bondedAtoms)
             {
                 glm::vec3 v = glm::normalize( nb->position - atom.position );
-                float bestDot = -2; int best = -1;
-                for (int i = 0; i < 4; ++i)
+                float best = -2.0f; int idx = -1;
+                for (int j = 0; j < 4; ++j)
                 {
-                    float d = glm::dot( v, tetraDir[ i ] );
-                    if (d > bestDot)
+                    float d = glm::dot( v, tetraDirs[ j ] );
+                    if (d > best)
                     {
-                        bestDot = d; best = i;
+                        best = d; idx = j;
                     }
                 }
-                if (best >= 0) used[ best ] = true;
+                if (idx >= 0) used[ idx ] = true;
             }
-
-            /* assign remaining dirs to LPs */
-            int left = atom.lonePairs;
-            for (int i = 0; i < 4 && left; ++i)
-            {
-                if (!used[ i ])
-                {
-                    out[ &atom ].push_back( atom.position + tetraDir[ i ] * (atom.radius + 0.02f) );
-                    --left;
-                }
-            }
-            continue;
+            for (int j = 0; j < 4 && int( lpDirs.size() ) < LP; ++j)
+                if (!used[ j ])
+                    lpDirs.push_back( tetraDirs[ j ] );
         }
 
-        for (int i = 0; i < atom.lonePairs; ++i)
+        float spread = atom.radius * 1.5f;  // tweak to taste
+        float baseR = atom.radius + centerOffset;
+        for (auto dir : lpDirs)
         {
-            float ang = i * glm::two_pi<float>() / atom.lonePairs;
-            glm::vec3 dir( cos( ang ), sin( ang ), 0 );
-            out[ &atom ].push_back( atom.position + dir * (atom.radius + 0.02f) );
+            dir = glm::normalize( dir );
+            glm::vec3 ref = (fabs( dir.y ) < 0.99f)
+                ? glm::vec3( 0, 1, 0 )
+                : glm::vec3( 1, 0, 0 );
+            glm::vec3 perp = glm::normalize( glm::cross( dir, ref ) );
+
+            glm::vec3 centre = atom.position + dir * baseR;
+
+            out[ &atom ].push_back( centre + perp * spread );
+            out[ &atom ].push_back( centre - perp * spread );
         }
     }
 }
+
+
 
 float AtomSystem::getIdealBondAngle( const Atom &atom ) {
     int bonded = atom.bondedAtoms.size();
@@ -315,13 +302,13 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
     int lp = a.lonePairs;
     int groups = bondedGroups + lp;
 
-    if (groups == 2) return "linear";
-    if (groups == 3) return (lp == 0 ? "trigonal planar" : "bent");
+    if (groups == 2) return "Linear";
+    if (groups == 3) return (lp == 0 ? "Trigonal planar" : "Bent");
     if (groups == 4)
     {
-        if (lp == 0) return "tetrahedral";
-        if (lp == 1) return "trigonal pyramidal";
-        if (lp == 2) return "bent";
+        if (lp == 0) return "Tetrahedral";
+        if (lp == 1) return "Trigonal pyramidal";
+        if (lp == 2) return "Bent";
     }
     return "unknown";
 }
