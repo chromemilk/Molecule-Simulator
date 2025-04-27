@@ -137,9 +137,11 @@
     <ClCompile Include="Bond.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="MathUtils.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Molecule Simulator.cpp" />
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
+    <ClCompile Include="PeriodicTable.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderLoader.cpp" />
@@ -154,8 +156,10 @@
     <ClInclude Include="Bond.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="MathUtils.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="PeriodicTable.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderLoader.h" />
@@ -164,8 +168,12 @@
   <ItemGroup>
     <None Include="bond_fragment.glsl" />
     <None Include="bond_vertex.glsl" />
+    <None Include="cyl.frag" />
+    <None Include="cyl.vert" />
     <None Include="particle_fragment.glsl" />
     <None Include="particle_vertex.glsl" />
+    <None Include="sphere.frag" />
+    <None Include="sphere.vert" />
     <None Include="text.frag" />
     <None Include="text.vert" />
   </ItemGroup>

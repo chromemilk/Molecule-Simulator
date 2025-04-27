@@ -31,6 +31,12 @@
     <Filter Include="Source Files\molecule">
       <UniqueIdentifier>{cfa5e083-c745-40b6-a15c-f940a7c3fba8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\table">
+      <UniqueIdentifier>{57f90dfb-9b34-4625-8242-fc6dfef79b5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\meshes">
+      <UniqueIdentifier>{7569e95f-7ab8-44b8-b4dd-734e69f14a27}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Molecule Simulator.cpp">
@@ -71,6 +77,12 @@
     </ClCompile>
     <ClCompile Include="ShaderLoader.cpp">
       <Filter>Source Files\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="PeriodicTable.cpp">
+      <Filter>Source Files\table</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Source Files\meshes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -116,6 +128,12 @@
     <ClInclude Include="ShaderLoader.h">
       <Filter>Source Files\renderer</Filter>
     </ClInclude>
+    <ClInclude Include="PeriodicTable.h">
+      <Filter>Source Files\table</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Source Files\meshes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_vertex.glsl">
@@ -134,6 +152,18 @@
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="text.frag">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="sphere.vert">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="sphere.frag">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="cyl.vert">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="cyl.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>

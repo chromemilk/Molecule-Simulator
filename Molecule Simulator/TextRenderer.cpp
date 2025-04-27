@@ -37,26 +37,23 @@ void TextRenderer::Init() {
 }
 
 void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight ) {
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ), (float)windowWidth / windowHeight, 0.1f, 100.0f );
-    glm::mat4 VP = proj * view;
+    glm::mat4 V = camera.GetViewMatrix();
+    glm::mat4 P = glm::perspective( glm::radians( camera.Zoom ),
+        float( windowWidth ) / windowHeight,
+        0.1f, 100.0f );
+    glm::vec4 clip = P * V * glm::vec4( worldPos, 1.0f );
+    if (clip.w <= 0) return;
+    glm::vec3 ndc = glm::vec3( clip ) / clip.w;
 
-    glm::vec4 clipSpace = VP * glm::vec4( worldPos, 1.0f );
+    float sx = (ndc.x * 0.5f + 0.5f) * windowWidth;
+    float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * windowHeight;
 
-    if (clipSpace.w <= 0.0f) return;  // behind camera
+    float tw = float( text.size() ) * 8.0f;
+    sx -= tw * 0.5f;
 
-    glm::vec3 ndc = glm::vec3( clipSpace ) / clipSpace.w; // perspective divide
-
-    // Map NDC [-1,1] to window coordinates
-    float screenX = (ndc.x * 0.5f + 0.5f) * windowWidth;
-    float screenY = (1.0f - (ndc.y * 0.5f + 0.5f)) * windowHeight; // flip Y
-
-    // Center the text horizontally
-    float textPixelWidth = (float)text.length() * 8.0f; // stb_easy_font is ~8px per char
-    screenX -= textPixelWidth * 0.5f;
 
     static char buffer[ 9999 ];
-    int quads = stb_easy_font_print( (int)screenX, (int)screenY,
+    int quads = stb_easy_font_print( (int)sx, (int)sy,
         const_cast<char *>(text.c_str()), nullptr, buffer, sizeof( buffer ) );
     if (quads <= 0) return;
 

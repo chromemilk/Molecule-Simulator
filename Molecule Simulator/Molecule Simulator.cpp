@@ -1,156 +1,128 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
-#include "stb_easy_font.h"
-#include "Renderer.h"
 #include "Camera.h"
-#include "AtomSystem.h"
+#include "Renderer.h"
 #include "TextRenderer.h"
+#include "AtomSystem.h"
 
 #include <iostream>
+#include <chrono>
 
-// Window settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+constexpr int WIN_W = 1280;
+constexpr int WIN_H = 720;
 
-// Camera setup
-Camera camera( glm::vec3( 0.0f, 0.0f, 8.0f ) );
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
-
-// Timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// Global window pointer
 GLFWwindow *window = nullptr;
+Camera      camera( glm::vec3( 0, 0, 8 ) );
+bool        firstMouse = true;
+float       lastX = WIN_W * 0.5f, lastY = WIN_H * 0.5f;
+
+float deltaTime = 0.f, lastFrame = 0.f;
 
 TextRenderer textRenderer;
-AtomSystem atomSystem( 100, textRenderer );
+AtomSystem   atoms( 100, textRenderer );
 
-// Mouse callback
-void mouse_callback( GLFWwindow *window, double xpos, double ypos ) {
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement( xoffset, yoffset );
+void framebuffer_size_callback( GLFWwindow *, int w, int h ) {
+    glViewport( 0, 0, w, h );
 }
 
-// Input processing
-void processInput( GLFWwindow *window ) {
-    if (glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
-        glfwSetWindowShouldClose( window, true );
+void mouse_callback( GLFWwindow *, double xpos, double ypos ) {
+    if (firstMouse)
+    {
+        lastX = (float)xpos; lastY = (float)ypos; firstMouse = false;
+    }
+    float xoff = (float)xpos - lastX;
+    float yoff = lastY - (float)ypos;   // reversed
+    lastX = (float)xpos;  lastY = (float)ypos;
+    camera.ProcessMouseMovement( xoff, yoff );
+}
 
-    if (glfwGetKey( window, GLFW_KEY_W ) == GLFW_PRESS)
-        camera.ProcessKeyboard( Camera_Movement::FORWARD, deltaTime );
-    if (glfwGetKey( window, GLFW_KEY_S ) == GLFW_PRESS)
-        camera.ProcessKeyboard( Camera_Movement::BACKWARD, deltaTime );
-    if (glfwGetKey( window, GLFW_KEY_A ) == GLFW_PRESS)
-        camera.ProcessKeyboard( Camera_Movement::LEFT, deltaTime );
-    if (glfwGetKey( window, GLFW_KEY_D ) == GLFW_PRESS)
-        camera.ProcessKeyboard( Camera_Movement::RIGHT, deltaTime );
+void scroll_callback( GLFWwindow *, double, double yoffset ) {
+    camera.ProcessMouseScroll( (float)yoffset );
+}
+
+void processInput( GLFWwindow *win ) {
+    if (glfwGetKey( win, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
+        glfwSetWindowShouldClose( win, true );
+
+    if (glfwGetKey( win, GLFW_KEY_W ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::FORWARD, deltaTime );
+    if (glfwGetKey( win, GLFW_KEY_S ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::BACKWARD, deltaTime );
+    if (glfwGetKey( win, GLFW_KEY_A ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::LEFT, deltaTime );
+    if (glfwGetKey( win, GLFW_KEY_D ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::RIGHT, deltaTime );
+}
+
+void buildWater( AtomSystem &sys ) {
+    sys.spawnAtom( "O" );               // index 0
+    sys.spawnAtom( "H" );               // index 1
+    sys.spawnAtom( "H" );               // index 2
+
+    sys.createBond( 0, 1, BondType::SINGLE );
+    sys.createBond( 0, 2, BondType::SINGLE );
+}
+
+void buildCO2( AtomSystem &sys ) {
+    sys.spawnAtom( "C" );               // 0
+    sys.spawnAtom( "O" );               // 1
+    sys.spawnAtom( "O" );               // 2
+
+    sys.createBond( 0, 1, BondType::DOUBLE );
+    sys.createBond( 0, 2, BondType::DOUBLE );
 }
 
 int main() {
-    // Initialize GLFW
-    if (!glfwInit())
-    {
-        std::cerr << "Failed to initialize GLFW\n";
-        return -1;
-    }
-
+    glfwInit();
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
     glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
     glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-
-    window = glfwCreateWindow( SCR_WIDTH, SCR_HEIGHT, "Molecule Simulator", nullptr, nullptr );
+    window = glfwCreateWindow( WIN_W, WIN_H, "Molecule Sim", nullptr, nullptr );
     if (!window)
     {
-        std::cerr << "Failed to create GLFW window\n";
-        glfwTerminate();
-        return -1;
+        std::cerr << "GLFW window failed\n"; return 1;
     }
     glfwMakeContextCurrent( window );
-
-    glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
+    glfwSetFramebufferSizeCallback( window, framebuffer_size_callback );
     glfwSetCursorPosCallback( window, mouse_callback );
+    glfwSetScrollCallback( window, scroll_callback );
+    glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
 
-    // Initialize GLAD
     if (!gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ))
     {
-        std::cerr << "Failed to initialize GLAD\n";
-        return -1;
+        std::cerr << "GLAD init failed\n"; return 1;
     }
+    glEnable( GL_DEPTH_TEST );
 
-    glEnable( GL_PROGRAM_POINT_SIZE );
-    glViewport( 0, 0, SCR_WIDTH, SCR_HEIGHT );
-
-    // Initialize the renderer and camera
-    Renderer::Init();
-    Renderer::SetCamera( &camera );
-
-    // Initialize the TextRenderer here (only once)
+    Renderer::Init( &camera );
     textRenderer.Init();
 
-    // --- Molecule Setup ---
-	
-    atomSystem.spawnAtom("C");
-	atomSystem.spawnAtom( "O" );
-	atomSystem.spawnAtom( "O" );
-    
-	atomSystem.createBond( 0, 1, BondType::DOUBLE );
-	atomSystem.createBond( 0, 2, BondType::DOUBLE );
-    
-
-    /*
-    atomSystem.spawnAtom( "O" );
-	atomSystem.spawnAtom( "H" );
-	atomSystem.spawnAtom( "H" );
-	atomSystem.createBond( 0, 1, BondType::SINGLE );
-	atomSystem.createBond( 0, 2, BondType::SINGLE );
-    */
-
-    atomSystem.updateLonePairs(); 
+    buildWater( atoms );
+    //buildCO2( atoms );        
 
 
-    // --- Main loop ---
     while (!glfwWindowShouldClose( window ))
     {
-        // Timing
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        float now = (float)glfwGetTime();
+        deltaTime = now - lastFrame;
+        lastFrame = now;
 
-        // Input
         processInput( window );
+        atoms.update( deltaTime );
 
-        // Logic
-        atomSystem.update( deltaTime );
-
-        // Render
-        glClearColor( 0.1f, 0.1f, 0.1f, 1.0f );
+        glClearColor( 0.05f, 0.05f, 0.05f, 1.f );
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-        // Render 3D atoms and bonds
-        atomSystem.render( SCR_WIDTH, SCR_HEIGHT );
+        int w, h;  glfwGetFramebufferSize( window, &w, &h );
+        atoms.render( w, h );
 
-        textRenderer.DrawScreenText( "Compound: CO2", 10.0f, 50.0f, SCR_WIDTH, SCR_HEIGHT );
-        textRenderer.DrawScreenText( "Double Bonds: 2", 10.0f, 70.0f, SCR_WIDTH, SCR_HEIGHT );
-        textRenderer.DrawScreenText( "Expected Angle: 180", 10.0f, 90.0f, SCR_WIDTH, SCR_HEIGHT );
-        textRenderer.DrawScreenText( "Avg Program Error: 1", 10.0f, 110.0f, SCR_WIDTH, SCR_HEIGHT );
+        float mag = atoms.computeDipole();
+        atoms.updateLonePairs();
 
+
+
+        textRenderer.DrawScreenText( "Molecule(s): H2O", 10, 30, w, h );
+        textRenderer.DrawScreenText( std::string( "Polarity: " ) + (atoms.isPolar ? "Polar" : "Non-Polar") + "; " + "Magnitude: " + std::to_string(mag), 10, 50, w, h);
+        textRenderer.DrawScreenText( "Correction Coef: " + std::to_string(atoms.latestCorrectionStrength), 10, 70, w, h );
 
         glfwSwapBuffers( window );
         glfwPollEvents();
@@ -158,5 +130,4 @@ int main() {
 
     Renderer::Shutdown();
     glfwTerminate();
-    return 0;
 }

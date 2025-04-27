@@ -1,82 +1,79 @@
 #include "AtomSystem.h"
 #include "Renderer.h"
-#include "Camera.h"
-#include <glm/gtc/matrix_transform.hpp>
-#include <GLFW/glfw3.h>
-#include <iostream>
+#include "PeriodicTable.h"
 #include "MathUtils.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
+#include <GLFW/glfw3.h>
 
 extern Camera camera;
 extern GLFWwindow *window;
 
-AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &textRenderer )
-    : maxAtoms( maxAtoms ), textRenderer( textRenderer ) {
+AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
+    : maxAtoms( maxAtoms ), textRenderer( tr ) {
 }
 
 void AtomSystem::update( float dt ) {
     for (auto &bond : bonds)
-    {
         bond.applyForce();
-    }
 
     applyVSEPRForces( dt );
 
     for (auto &atom : atoms)
-    {
         atom.update( dt );
-    }
 }
+void AtomSystem::render( int w, int h ) {
 
-void AtomSystem::render( int windowWidth, int windowHeight ) {
-    // Save OpenGL state
-    GLboolean wasDepthTestEnabled = glIsEnabled( GL_DEPTH_TEST );
-    GLboolean wasBlendEnabled = glIsEnabled( GL_BLEND );
-
-    // Draw all bonds
-    for (auto &bond : bonds)
+    /* first central atom's geometry for HUD */
+    if (firstCentralGeometry.empty())
     {
-        bond.render();
-    }
-
-    // Draw all atoms
-    for (auto &atom : atoms)
-    {
-        Renderer::DrawParticle( atom.position, atom.color, atom.radius * 60.0f );
-    }
-
-    // Draw atom labels above each atom
-    for (auto &atom : atoms)
-    {
-        textRenderer.DrawText( atom.type, atom.position, windowWidth, windowHeight );
-    }
-
-	renderBondAngles( windowWidth, windowHeight );
-
-
-    // Draw lone pairs
-    std::unordered_map<Atom *, std::vector<glm::vec3>> lonePairPositions;
-    computeLonePairPositions( lonePairPositions );
-
-    for (auto &kv : lonePairPositions)
-    {
-        for (auto &lpPos : kv.second)
+        for (auto &a : atoms)
         {
-            Renderer::DrawParticle( lpPos, glm::vec3( 0.8f, 0.8f, 0.8f ), 5.0f ); // light gray dot
+            if (a.bondedAtoms.size() >= 2 || a.lonePairs > 0)
+            {
+                firstCentralGeometry = determineGeometry( a );
+                break;
+            }
+        }
+    }
+
+    for (auto &b : bonds)
+    {
+        b.render( w, h );
+    }
+
+    for (auto &a : atoms)
+    {
+        Renderer::DrawAtom( a, w, h );
+    }
+
+    for (auto &a : atoms)
+    {
+        textRenderer.DrawText( a.type, a.position, w, h );
+    }
+
+    renderBondAngles( w, h );
+
+    // Lone pairs as smaller spheres 
+    std::unordered_map<Atom *, std::vector<glm::vec3>> lp;
+    computeLonePairPositions( lp );
+
+    for (auto &kv : lp)
+        for (auto &pos : kv.second)
+        {
+            Atom dot( "LP", pos, 1.f );
+            dot.radius = 0.08f;
+            dot.color = glm::vec3( 0.7f, 0.7f, 1.0f );
+            Renderer::DrawAtom( dot, w, h );
         }
 
-     //   if (!kv.second.empty())
-       // {
-      //     glm::vec3 firstLpPos = kv.second.front();
-      //      textRenderer.DrawText( "LP", firstLpPos, windowWidth, windowHeight );
-      //  }
+    /* HUD: geometry name (top-left) */
+    if (!firstCentralGeometry.empty())
+    {
+        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry,
+            10, 90, w, h );
     }
 
-    // Restore OpenGL state
-    if (!wasDepthTestEnabled) glDisable( GL_DEPTH_TEST );
-    else glEnable( GL_DEPTH_TEST );
-
-    if (!wasBlendEnabled) glDisable( GL_BLEND );
-    else glEnable( GL_BLEND );
 }
 
 
@@ -84,16 +81,13 @@ void AtomSystem::spawnAtom( const std::string &type ) {
     if (atoms.size() < maxAtoms)
     {
         glm::vec3 pos = MathUtils::GetRandomVector3( -2.0f, 2.0f );
-        float mass = 1.0f;
-        atoms.emplace_back( type, pos, mass );
+        atoms.emplace_back( type, pos, 1.0f );
     }
 }
 
 void AtomSystem::addAtom( const Atom &atom ) {
     if (atoms.size() < maxAtoms)
-    {
         atoms.push_back( atom );
-    }
 }
 
 void AtomSystem::createBond( int indexA, int indexB, BondType bondType ) {
@@ -102,6 +96,10 @@ void AtomSystem::createBond( int indexA, int indexB, BondType bondType ) {
         bonds.emplace_back( &atoms[ indexA ], &atoms[ indexB ], bondType );
         atoms[ indexA ].bondedAtoms.push_back( &atoms[ indexB ] );
         atoms[ indexB ].bondedAtoms.push_back( &atoms[ indexA ] );
+    }
+    else
+    {
+        std::cerr << "Invalid bond indices!" << std::endl;
     }
 }
 
@@ -121,104 +119,28 @@ void AtomSystem::applyVSEPRForces( float dt ) {
                 glm::vec3 vecB = glm::normalize( neighborB->position - atom.position );
 
                 float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
-
                 float idealAngle = getIdealBondAngle( atom );
 
                 float angleError = currentAngle - idealAngle;
 
                 if (fabs( angleError ) > 0.5f)
                 {
-                    glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.15f);
+                    glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
 
-                    latestCorrectionStrength = glm::length( correction ); 
+                    if (!neighborA->fixed) neighborA->velocity += correction;
+                    if (!neighborB->fixed) neighborB->velocity += correction;
 
-                    // Just clamp until I make some PID or something 
-                    if (glm::length( correction ) > 5.f)
-                    {
-						correction = glm::normalize( correction ) * 5.f; // cap the correction
-                    }
-
-                    if (!neighborA->fixed)
-                        neighborA->velocity += correction;
-                    if (!neighborB->fixed)
-                        neighborB->velocity += correction;
+                    latestCorrectionStrength = glm::length( correction );
                 }
             }
         }
     }
 }
 
-static int valenceFor( const std::string &t ) {
-    if (t == "H") return 1;
-    if (t == "O") return 6;
-    if (t == "N") return 5;
-    if (t == "C") return 4;
-    return 4;
-}
-
-float AtomSystem::getIdealBondAngle( const Atom &atom ) {
-    int bondedGroups = 0;           // counts each neighbor once
-    int bondElectronPairs = 0;      // counts total electron pairs
-
-    for (auto &bond : bonds)
-    {
-        if (bond.atomA == &atom || bond.atomB == &atom)
-        {
-            bondedGroups += 1;
-            bondElectronPairs += bond.bondOrder();
-        }
-    }
-
-    int valence = valenceFor( atom.type );
-    int lonePairElectrons = std::max( 0, valence - bondElectronPairs );
-    int lonePairs = lonePairElectrons / 2;
-
-    int totalGroups = bondedGroups + lonePairs;  // VSEPR groups
-
-    if (totalGroups == 2) return 180.0f;          // linear
-    if (totalGroups == 3) return 120.0f;          // trigonal planar
-    if (totalGroups == 4)
-    {                       // tetrahedral family
-        if (lonePairs == 0) return 109.5f;        
-        if (lonePairs == 1) return 107.0f;       
-        if (lonePairs == 2) return 104.5f;        
-    }
-    // fallback
-    return 109.5f;
-}
-
-
-
-
-void AtomSystem::updateLonePairs() {
-    for (auto &atom : atoms)
-    {
-        int bondOrderSum = 0;
-        for (auto &bond : bonds)
-        {
-            if (bond.atomA == &atom || bond.atomB == &atom)
-            {
-                bondOrderSum += bond.bondOrder(); // bondOrder = 1, 2, or 3
-            }
-        }
-
-        int valence = valenceFor( atom.type );
-
-        int lonePairElectrons = std::max( 0, valence - bondOrderSum );
-        atom.lonePairs = lonePairElectrons / 2; // each lone pair = 2 electrons
-    }
-}
-
-
-
-
-
 void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
     for (auto &atom : atoms)
     {
-        // Only atoms that are bonded to 2+ neighbors (true angle centers)
         if (atom.bondedAtoms.size() < 2) continue;
-        if (atom.type == "H") continue; // skip hydrogens
 
         for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
         {
@@ -235,83 +157,171 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
                 glm::vec3 labelPos = (atom.position + neighborA->position + neighborB->position) / 3.0f;
 
                 float ideal = getIdealBondAngle( atom );
+                std::string label = "Angle: " + std::to_string( int( angle ) ) + " (Ideal: " + std::to_string( int( ideal ) ) + ")";
 
-                std::string label = "Angle: " + std::to_string( (int)angle ) + " (Ideal: " + std::to_string( (int)ideal ) + ")";
                 textRenderer.DrawText( label, labelPos, windowWidth, windowHeight );
             }
         }
     }
-
-    // Draw correction aggression once at the top left corner
-    std::string corrText = "Correction Aggression: " + std::to_string( latestCorrectionStrength );
-    textRenderer.DrawScreenText( corrText, 10.0f, 30.0f, windowWidth, windowHeight );
 }
 
-static std::vector<glm::vec3> tetrDirs{
-    { 1, 1, 1}, {-1,-1, 1},
-    { 1,-1,-1}, {-1, 1,-1}
-};
-void AtomSystem::computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
+void AtomSystem::updateLonePairs() {
+    for (auto &atom : atoms)
+    {
+        int bondElectronPairs = 0;
+        for (auto &bond : bonds)
+        {
+            if (bond.atomA == &atom || bond.atomB == &atom)
+                bondElectronPairs += bond.bondOrder();
+        }
+        int valence = PeriodicTable::Instance().Get( atom.type ).valenceElectrons;
+        int lonePairElectrons = std::max( 0, valence - bondElectronPairs );
+        atom.lonePairs = lonePairElectrons / 2;
+    }
+}
+
+float AtomSystem::computeDipole() {
+    netDipole = glm::vec3( 0.0f );
+    auto &pt = PeriodicTable::Instance();
+
+    for (auto &bond : bonds)
+    {
+        const auto &elemA = pt.Get( bond.atomA->type );
+        const auto &elemB = pt.Get( bond.atomB->type );
+
+        float enA = elemA.electronegativity;
+        float enB = elemB.electronegativity;
+
+        glm::vec3 dir = glm::normalize( bond.atomB->position - bond.atomA->position );
+
+        if (enA > enB) dir = -dir;
+
+        float deltaEN = fabs( enA - enB );        // strength
+        netDipole += dir * deltaEN;          // accumulate vector
+    }
+
+    dipoleMag = glm::length( netDipole );
+    isPolar = (dipoleMag > 1e-2f);
+    return dipoleMag;                            
+}
+
+
+void AtomSystem::computeLonePairPositions(
+    std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
     out.clear();
 
-    static const std::vector<glm::vec3> tetrahedralDirs = {
-        glm::normalize( glm::vec3( 1, 1, 1 ) ),
-        glm::normalize( glm::vec3( -1, -1, 1 ) ),
+    /* universal tetrahedral directions (object-space unit vectors) */
+    static const glm::vec3 tetraDir[ 4 ] = {
+        glm::normalize( glm::vec3( 1,  1,  1 ) ),
+        glm::normalize( glm::vec3( -1, -1,  1 ) ),
         glm::normalize( glm::vec3( 1, -1, -1 ) ),
-        glm::normalize( glm::vec3( -1, 1, -1 ) )
+        glm::normalize( glm::vec3( -1,  1, -1 ) )
     };
 
     for (auto &atom : atoms)
     {
         if (atom.lonePairs == 0) continue;
 
-        int bonded = int( atom.bondedAtoms.size() );
+        int bonded = (int)atom.bondedAtoms.size();
         int groups = bonded + atom.lonePairs;
 
+        if (groups <= 3)
+        {
+            glm::vec3 ref( 1, 0, 0 );
+            if (bonded > 0) ref = glm::normalize( atom.bondedAtoms[ 0 ]->position - atom.position );
+
+            glm::vec3 normal( 0, 0, 1 );                                      // default plane normal
+            if (bonded >= 2)
+                normal = glm::normalize( glm::cross(
+                    atom.bondedAtoms[ 0 ]->position - atom.position,
+                    atom.bondedAtoms[ 1 ]->position - atom.position ) );
+
+            for (int i = 0; i < atom.lonePairs; ++i)
+            {
+                float ang = i * glm::two_pi<float>() / atom.lonePairs;
+                glm::vec3 dir = glm::normalize( glm::vec3(
+                    ref.x * cos( ang ) - ref.y * sin( ang ),
+                    ref.x * sin( ang ) + ref.y * cos( ang ),
+                    0.0f ) );
+
+                if (groups == 3 && atom.lonePairs == 1) dir = normal;          // trig-planar, single LP -> above plane
+                dir = glm::normalize( dir );
+                out[ &atom ].push_back( atom.position + dir * (atom.radius + 0.02f) );
+            }
+            continue;
+        }
+
+        /* ------------------------------------------------ tetrahedral family (groups ==4) */
         if (groups == 4)
         {
-            // tetrahedral
-            std::vector<bool> used( 4, false );
-            for (auto *neighbor : atom.bondedAtoms)
+            /* mark which tetra direction already occupied by bonds */
+            bool used[ 4 ] = { false,false,false,false };
+            for (Atom *nb : atom.bondedAtoms)
             {
-                glm::vec3 bondVec = glm::normalize( neighbor->position - atom.position );
-                float bestDot = -2.0f;
-                int best = -1;
+                glm::vec3 v = glm::normalize( nb->position - atom.position );
+                float bestDot = -2; int best = -1;
                 for (int i = 0; i < 4; ++i)
                 {
-                    float dot = glm::dot( bondVec, tetrahedralDirs[ i ] );
-                    if (dot > bestDot)
+                    float d = glm::dot( v, tetraDir[ i ] );
+                    if (d > bestDot)
                     {
-                        bestDot = dot;
-                        best = i;
+                        bestDot = d; best = i;
                     }
                 }
                 if (best >= 0) used[ best ] = true;
             }
 
-            int remaining = atom.lonePairs;
-            for (int i = 0; i < 4 && remaining > 0; ++i)
+            /* assign remaining dirs to LPs */
+            int left = atom.lonePairs;
+            for (int i = 0; i < 4 && left; ++i)
             {
                 if (!used[ i ])
                 {
-                    glm::vec3 dir = tetrahedralDirs[ i ];
-                    out[ &atom ].push_back( atom.position + dir * atom.radius * 1.8f );
-                    out[ &atom ].push_back( atom.position + dir * atom.radius * 2.2f ); // slightly offset second electron
-                    --remaining;
+                    out[ &atom ].push_back( atom.position + tetraDir[ i ] * (atom.radius + 0.02f) );
+                    --left;
                 }
             }
+            continue;
         }
-        else
+
+        for (int i = 0; i < atom.lonePairs; ++i)
         {
-            // fallback if not tetrahedral
-            for (int i = 0; i < atom.lonePairs; ++i)
-            {
-                float angle = i * glm::two_pi<float>() / atom.lonePairs;
-                glm::vec3 dir( cos( angle ), sin( angle ), 0 );
-                out[ &atom ].push_back( atom.position + dir * atom.radius * 2.0f );
-                out[ &atom ].push_back( atom.position + dir * atom.radius * 2.2f );
-            }
+            float ang = i * glm::two_pi<float>() / atom.lonePairs;
+            glm::vec3 dir( cos( ang ), sin( ang ), 0 );
+            out[ &atom ].push_back( atom.position + dir * (atom.radius + 0.02f) );
         }
     }
 }
 
+float AtomSystem::getIdealBondAngle( const Atom &atom ) {
+    int bonded = atom.bondedAtoms.size();
+    int lonePairs = atom.lonePairs;
+    int totalGroups = bonded + lonePairs;
+
+    if (totalGroups == 2) return 180.0f;
+    if (totalGroups == 3) return 120.0f;
+    if (totalGroups == 4)
+    {
+        if (lonePairs == 0) return 109.5f;
+        if (lonePairs == 1) return 107.0f;
+        if (lonePairs == 2) return 104.5f;
+    }
+    return 109.5f;
+}
+
+
+std::string AtomSystem::determineGeometry( const Atom &a ) const {
+    int bondedGroups = (int)a.bondedAtoms.size();
+    int lp = a.lonePairs;
+    int groups = bondedGroups + lp;
+
+    if (groups == 2) return "linear";
+    if (groups == 3) return (lp == 0 ? "trigonal planar" : "bent");
+    if (groups == 4)
+    {
+        if (lp == 0) return "tetrahedral";
+        if (lp == 1) return "trigonal pyramidal";
+        if (lp == 2) return "bent";
+    }
+    return "unknown";
+}

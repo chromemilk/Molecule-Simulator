@@ -52,7 +52,7 @@ void ParticleSystem::render() {
     {
         if (p.isAlive())
         {
-            Renderer::DrawParticle( p.position, p.color, p.size );
+          //  Renderer::DrawParticle( p.position, p.color, p.size );
         }
     }
 }

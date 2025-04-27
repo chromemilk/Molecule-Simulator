@@ -1,9 +1,6 @@
 #pragma once
-
 #include <vector>
-#include <string>
-#include <glm/glm.hpp>
-
+#include <unordered_map>
 #include "Atom.h"
 #include "Bond.h"
 #include "TextRenderer.h"
@@ -11,29 +8,36 @@
 class AtomSystem
 {
 public:
-    float latestCorrectionStrength = 0.0f;
-
-    AtomSystem( unsigned int maxAtoms, TextRenderer &textRenderer );
+    AtomSystem( unsigned maxAtoms, TextRenderer &tr );
 
     void update( float dt );
-    void render( int windowWidth, int windowHeight );
+    void render( int w, int h );
 
     void spawnAtom( const std::string &type );
     void addAtom( const Atom &atom );
-    void createBond( int indexA, int indexB, BondType bondType = BondType::SINGLE );
+    void createBond( int ia, int ib, BondType t = BondType::SINGLE );
 
-    void updateLonePairs(); // compute lone pairs
-    void computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
+    void updateLonePairs();                             
+    float computeDipole();   
 
+    bool isPolar = false;
+    float latestCorrectionStrength = 0.0f;
 
 private:
-    std::vector<Atom> atoms;
-    std::vector<Bond> bonds;
-    unsigned int maxAtoms;
-
-    TextRenderer &textRenderer;
-
     void applyVSEPRForces( float dt );
-    float getIdealBondAngle( const Atom &atom );
-    void renderBondAngles( int windowWidth, int windowHeight );
+    void renderBondAngles( int w, int h );
+    float getIdealBondAngle( const Atom &a );
+    void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> & );
+    std::string determineGeometry( const Atom & ) const;
+
+    unsigned                maxAtoms{};
+    std::vector<Atom>       atoms;
+    std::vector<Bond>       bonds;
+    TextRenderer &textRenderer;
+    std::string             firstCentralGeometry{};
+
+    glm::vec3 netDipole{ 0.0f };   
+    float     dipoleMag{ 0.0f };   
+
+
 };
