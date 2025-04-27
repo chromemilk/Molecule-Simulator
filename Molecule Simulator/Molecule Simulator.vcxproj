@@ -170,6 +170,8 @@
     <None Include="bond_vertex.glsl" />
     <None Include="cyl.frag" />
     <None Include="cyl.vert" />
+    <None Include="grid.frag" />
+    <None Include="grid.vert" />
     <None Include="particle_fragment.glsl" />
     <None Include="particle_vertex.glsl" />
     <None Include="sphere.frag" />

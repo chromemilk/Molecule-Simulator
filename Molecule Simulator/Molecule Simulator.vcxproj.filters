@@ -166,5 +166,11 @@
     <None Include="cyl.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
+    <None Include="grid.frag">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="grid.vert">
+      <Filter>Source Files\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
