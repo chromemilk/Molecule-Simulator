@@ -2,6 +2,14 @@
 
 A real-time 3D simulation written in modern C++ using OpenGL.
 
+## Example
+
+
+
+https://github.com/user-attachments/assets/50a38de4-254e-4a4c-a0e2-8b7ebd3fa7c9
+
+
+
 ## ✨ Features
 - Electron geometry calculations
 - Predicts and dynamically finds bond angles
@@ -67,5 +75,7 @@ cd build
 cmake ..
 make
 ./Molecule Simulator
+
+
 
 
