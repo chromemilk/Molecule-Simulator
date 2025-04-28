@@ -162,10 +162,10 @@ int main() {
 
         atoms.render(w, h);
 
-        float mag = atoms.computeDipole();
+        float totalPolarityMagnitude = atoms.computeDipole();
         textRenderer.DrawScreenText(currentPrebuiltAtom + " -- Polarity: " + std::string(atoms.isPolar ? "Polar" : "Non-Polar"),
             10, 30, w, h);
-        textRenderer.DrawScreenText("Dipole Magnitude: " + std::to_string(mag),
+        textRenderer.DrawScreenText("Dipole Magnitude: " + std::to_string(totalPolarityMagnitude),
             10, 50, w, h);
         textRenderer.DrawScreenText("Adjustment Magnitude: " + std::to_string(atoms.latestCorrectionStrength),
             10, 70, w, h);

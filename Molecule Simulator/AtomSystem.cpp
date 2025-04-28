@@ -24,6 +24,9 @@ void AtomSystem::update( float dt ) {
 
     for (auto &atom : atoms)
         atom.update( dt );
+
+    updatePolarities();       
+
 }
 void AtomSystem::render( int w, int h ) {
 
@@ -79,12 +82,21 @@ void AtomSystem::render( int w, int h ) {
             Renderer::DrawAtom( dot, w, h );
         }
 
-    /* HUD: geometry name (top-left) */
+    // Molecule geometry
     if (!firstCentralGeometry.empty())
     {
         textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry,
             10, 90, w, h );
     }
+
+
+    // draw a little red arrow above each atom showing its local dipole
+    for (const Atom& a : atoms) {
+        glm::vec3 start = a.position + glm::vec3(0.0f, a.radius + 0.1f, 0.0f);
+        glm::vec3 end = start + a.polarityDir * 0.5f;   // adjust length to taste
+        Renderer::DrawArrow(start, end, glm::vec3(1.0f, 0.0f, 0.0f), w, h);
+    }
+
 
 }
 
@@ -352,5 +364,28 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
         else if (order == 3) t = BondType::TRIPLE;
 
         createBond( a, b, t );
+    }
+}
+
+
+void AtomSystem::updatePolarities() {
+    auto& pt = PeriodicTable::Instance();
+    for (Atom& a : atoms) {
+        glm::vec3 sum(0.0f);
+        float enA = pt.Get(a.type).electronegativity;
+
+        for (Atom* nb : a.bondedAtoms) {
+            float enB = pt.Get(nb->type).electronegativity;
+            float dEN = fabs(enA - enB);
+
+            glm::vec3 dir = glm::normalize(nb->position - a.position);
+            if (enA > enB) dir = -dir;
+            sum += dir * dEN;
+        }
+
+        if (glm::length(sum) > 1e-6f)
+            a.polarityDir = glm::normalize(sum);
+        else
+            a.polarityDir = glm::vec3(0, 1, 0);
     }
 }

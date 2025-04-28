@@ -16,6 +16,7 @@ public:
     bool fixed = false;       // If true, atom doesn't move
     int lonePairs = 0;
 	int formalCharge = 0; // Formal charge
+    glm::vec3 polarityDir{ 0.f }; // Gives the direction in 3D space
 
     std::vector<Atom *> bondedAtoms; // List of atoms this atom is bonded to
 
