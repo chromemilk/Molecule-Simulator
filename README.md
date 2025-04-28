@@ -6,7 +6,9 @@ A real-time 3D simulation written in modern C++ using OpenGL.
 
 
 
-https://github.com/user-attachments/assets/50a38de4-254e-4a4c-a0e2-8b7ebd3fa7c9
+
+https://github.com/user-attachments/assets/ce91ff1f-9787-4f5e-83ff-46e27470fa9b
+
 
 
 
