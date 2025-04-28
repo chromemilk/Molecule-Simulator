@@ -1,25 +1,15 @@
 #version 330 core
-layout(location = 0) in vec3 aPos;      // position only
+layout(location = 0) in vec3 aPos;
+out vec3 FragPos;
+out vec3 Normal;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
-out vec3 vNormal;                      
-out vec3 vWorldPos;
-
 void main()
 {
-    // object-space position & normal
-    vec3 objectPos    = aPos;
-    vec3 objectNormal = normalize(aPos);          // unit sphere
-
-    // world space
-    vec3 worldPos = vec3(model * vec4(objectPos, 1.0));
-    vec3 worldNrm = normalize(mat3(model) * objectNormal);
-
-    vWorldPos = worldPos;
-    vNormal   = worldNrm;
-
-    gl_Position = projection * view * vec4(worldPos, 1.0);
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    Normal = mat3(transpose(inverse(model))) * aPos;
+    gl_Position = projection * view * vec4(FragPos, 1.0);
 }

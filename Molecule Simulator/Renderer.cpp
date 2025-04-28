@@ -135,6 +135,8 @@ void Renderer::DrawAtom( const Atom &a, int w, int h ) {
     sphereShader->setMat4( "projection", proj );
     sphereShader->setMat4( "model", model );
     sphereShader->setVec3( "color", a.color );
+    sphereShader->setVec3( "lightPos", glm::vec3( 5.0f, 5.0f, 5.0f ) ); // Example light
+    sphereShader->setVec3( "viewPos", cameraPtr->Position );
     sphereMesh.Draw();
 }
 

@@ -163,7 +163,7 @@ int main() {
         atoms.render(w, h);
 
         float totalPolarityMagnitude = atoms.computeDipole();
-        textRenderer.DrawScreenText(currentPrebuiltAtom + " -- Polarity (electro neg estimation): " + std::string(atoms.isPolar ? "Polar" : "Non-Polar"),
+        textRenderer.DrawScreenText(currentPrebuiltAtom + " -- Polarity (partial charge and bond): " + std::string(atoms.isPolar ? "Polar" : "Non-Polar"),
             10, 30, w, h);
         textRenderer.DrawScreenText("Dipole Magnitude: " + std::to_string(totalPolarityMagnitude),
             10, 50, w, h);
