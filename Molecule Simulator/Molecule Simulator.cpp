@@ -138,7 +138,7 @@ int main() {
     textRenderer.Init();
 
     // Change this to see different atoms, or make your own using the molecule builder
-    buildCH4(atoms);
+    buildO3(atoms);
 
 
     while (!glfwWindowShouldClose(window))

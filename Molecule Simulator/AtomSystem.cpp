@@ -227,6 +227,7 @@ float AtomSystem::computeDipole() {
 
     dipoleMag = glm::length( netDipole );
     isPolar = (dipoleMag > 1e-2f);
+  
     return dipoleMag;                            
 }
 
