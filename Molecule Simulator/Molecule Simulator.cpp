@@ -118,7 +118,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    window = glfwCreateWindow(WIN_W, WIN_H, "3D Compound Lewis Structure Viewer", nullptr, nullptr);
+    window = glfwCreateWindow(WIN_W, WIN_H, "Molecule Viewer", nullptr, nullptr);
     if (!window)
     {
         std::cerr << "GLFW failed\n"; return 1;
@@ -163,7 +163,7 @@ int main() {
         atoms.render(w, h);
 
         float totalPolarityMagnitude = atoms.computeDipole();
-        textRenderer.DrawScreenText(currentPrebuiltAtom + " -- Polarity: " + std::string(atoms.isPolar ? "Polar" : "Non-Polar"),
+        textRenderer.DrawScreenText(currentPrebuiltAtom + " -- Polarity (electro neg estimation): " + std::string(atoms.isPolar ? "Polar" : "Non-Polar"),
             10, 30, w, h);
         textRenderer.DrawScreenText("Dipole Magnitude: " + std::to_string(totalPolarityMagnitude),
             10, 50, w, h);
@@ -177,7 +177,7 @@ int main() {
             10, 150, w, h);
         textRenderer.DrawScreenText("Sigma Bonds: " + std::to_string(atoms.sigmaBonds),
             10, 170, w, h);
-        textRenderer.DrawScreenText("Pi Bonds: " + std::to_string(atoms.piBonds),
+        textRenderer.DrawScreenText("PI Bonds: " + std::to_string(atoms.piBonds),
             10, 190, w, h);
         textRenderer.DrawScreenText("Simulation Stability: " + std::to_string(1 - (0.5 * atoms.latestCorrectionStrength)),
             10, 210, w, h);
