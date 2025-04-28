@@ -79,8 +79,17 @@ void AtomSystem::render( int w, int h ) {
             Atom dot( "LP", pos, 1.f );
             dot.radius = 0.08f;
             dot.color = glm::vec3( 0.7f, 0.7f, 1.0f );
+			// Make lone pairs semi-transparent
+            glEnable( GL_BLEND );
+            glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+            glDepthMask( GL_FALSE );
+
             Renderer::DrawAtom( dot, w, h );
         }
+    	// Disable trasparency for the rest
+        glDisable( GL_BLEND );
+        glDepthMask( GL_TRUE );
+
 
     // Molecule geometry
     if (!firstCentralGeometry.empty())
