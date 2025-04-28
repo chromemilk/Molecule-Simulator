@@ -211,24 +211,19 @@ float AtomSystem::computeDipole() {
 
     for (auto &bond : bonds)
     {
-        const auto &elemA = pt.Get( bond.atomA->type );
-        const auto &elemB = pt.Get( bond.atomB->type );
+        float enA = pt.Get( bond.atomA->type ).electronegativity;
+        float enB = pt.Get( bond.atomB->type ).electronegativity;
+        float deltaEN = fabs( enA - enB );
 
-        float enA = elemA.electronegativity;
-        float enB = elemB.electronegativity;
-
-        glm::vec3 dir = glm::normalize( bond.atomB->position - bond.atomA->position );
-
-        if (enA > enB) dir = -dir;
-
-        float deltaEN = fabs( enA - enB );        // strength
-        netDipole += dir * deltaEN;          // accumulate vector
+        // use the full displacement vector
+        glm::vec3 disp = bond.atomB->position - bond.atomA->position;
+        // bond dipole -> (d) EN * (rB - rA)
+        netDipole += disp * deltaEN;
     }
 
     dipoleMag = glm::length( netDipole );
     isPolar = (dipoleMag > 1e-2f);
-  
-    return dipoleMag;                            
+    return dipoleMag;
 }
 
 
@@ -363,9 +358,10 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
         // Sigma bonds are either the second or third bonds in the bonding group
         BondType t = BondType::SINGLE;
         if (order == 1) {
+            sigmaBonds++;
             singleBonds++;
         }
-        if (order == 2) { 
+        else if (order == 2) { 
             t = BondType::DOUBLE;
             sigmaBonds++;
             piBonds++;
@@ -384,23 +380,30 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
 
 
 void AtomSystem::updatePolarities() {
-    auto& pt = PeriodicTable::Instance();
-    for (Atom& a : atoms) {
-        glm::vec3 sum(0.0f);
-        float enA = pt.Get(a.type).electronegativity;
+    auto &pt = PeriodicTable::Instance();
+    for (Atom &a : atoms)
+    {
+        glm::vec3 sum( 0.0f );
+        float enA = pt.Get( a.type ).electronegativity;
 
-        for (Atom* nb : a.bondedAtoms) {
-            float enB = pt.Get(nb->type).electronegativity;
-            float dEN = fabs(enA - enB);
+        for (Atom *nb : a.bondedAtoms)
+        {
+            float enB = pt.Get( nb->type ).electronegativity;
+            float dEN = fabs( enA - enB );
 
-            glm::vec3 dir = glm::normalize(nb->position - a.position);
-            if (enA > enB) dir = -dir;
-            sum += dir * dEN;
+            glm::vec3 disp = nb->position - a.position;
+            // Only normalize after sum
+            sum += glm::normalize( disp ) * dEN * glm::length( disp );
         }
 
-        if (glm::length(sum) > 1e-6f)
-            a.polarityDir = glm::normalize(sum);
+        // Lower tolerance 
+        if (glm::length( sum ) > 1e-6f)
+        {
+            a.polarityDir = glm::normalize( sum );
+        }
         else
-            a.polarityDir = glm::vec3(0, 1, 0);
+        {
+            a.polarityDir = glm::vec3( 0, 1, 0 );
+        }
     }
 }
