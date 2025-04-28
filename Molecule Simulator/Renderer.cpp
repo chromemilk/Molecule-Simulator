@@ -126,21 +126,21 @@ void Renderer::DrawGrid( int w, int h ) {
 void Renderer::DrawAtom( const Atom &a, int w, int h, bool highlight ) {
     glm::mat4 proj = glm::perspective( glm::radians( 45.0f ),
         (float)w / (float)h, 0.1f, 100.0f );
-    glm::mat4 model = glm::translate( glm::mat4( 1 ), a.position )
-        * glm::scale( glm::mat4( 1 ), glm::vec3( a.radius ) );
+    glm::mat4 model = glm::translate( glm::mat4( 1 ), a.position ) *
+        glm::scale( glm::mat4( 1 ), glm::vec3( a.radius ) );
 
     sphereShader->use();
     sphereShader->setMat4( "view", cameraPtr->GetViewMatrix() );
     sphereShader->setMat4( "projection", proj );
     sphereShader->setMat4( "model", model );
     sphereShader->setVec3( "color", a.color );
-
-    sphereShader->setFloat( "emissiveBoost", highlight ? 1.0f : 0.0f );
-
     sphereShader->setVec3( "lightPos", glm::vec3( 5.0f, 5.0f, 5.0f ) );
     sphereShader->setVec3( "viewPos", cameraPtr->Position );
+    sphereShader->setFloat( "emissiveBoost", highlight ? 1.0f : 0.0f );
+
     sphereMesh.Draw();
 }
+
 
 
 void Renderer::DrawBondCylinder( const glm::vec3 &A,
@@ -163,7 +163,7 @@ void Renderer::DrawBondCylinder( const glm::vec3 &A,
     cylinderShader->setMat4( "view", cameraPtr->GetViewMatrix() );
     cylinderShader->setMat4( "projection", proj );
     cylinderShader->setMat4( "model", model );
-    cylinderShader->setVec3( "color", color );
+    cylinderShader->setVec3( "color", color );   
     cylinderMesh.Draw();
 }
 

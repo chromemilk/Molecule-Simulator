@@ -33,7 +33,6 @@ void AtomSystem::update( float dt ) {
 }
 void AtomSystem::render( int w, int h ) {
 
-    /* first central atom's geometry for HUD */
     if (firstCentralGeometry.empty())
     {
         for (auto &a : atoms)
@@ -108,7 +107,7 @@ void AtomSystem::render( int w, int h ) {
     // draw a little red arrow above each atom showing its local dipole
     for (const Atom& a : atoms) {
         glm::vec3 start = a.position + glm::vec3(0.0f, a.radius + 0.1f, 0.0f);
-        glm::vec3 end = start + a.polarityDir * 0.5f;   // adjust length to taste
+        glm::vec3 end = start + a.polarityDir * 0.5f;   // adjust length 
         Renderer::DrawArrow(start, end, glm::vec3(1.0f, 0.0f, 0.0f), w, h);
     }
 

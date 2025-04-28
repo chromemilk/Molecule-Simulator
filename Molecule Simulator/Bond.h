@@ -22,4 +22,5 @@ public:
     Atom *atomA{};
     Atom *atomB{};
     BondType type{ BondType::SINGLE };
+    float restLen{ 1.0f };
 };

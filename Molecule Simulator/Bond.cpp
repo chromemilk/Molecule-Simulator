@@ -3,23 +3,26 @@
 #include <glm/glm.hpp>
 
 Bond::Bond( Atom *a, Atom *b, BondType t ) : atomA( a ), atomB( b ), type( t ) {
+    restLen = glm::length( atomB->position - atomA->position );
 }
+
 
 void Bond::applyForce() {
     if (!atomA || !atomB) return;
 
     glm::vec3 d = atomB->position - atomA->position;
-    float     L = glm::length( d );
+    float      L = glm::length( d );
     if (L == 0) return;
 
     glm::vec3 dir = d / L;
-    float      k = 4.0f;          // spring constant
-    float      x = L - 1.0f;      // rest length = 1
-    glm::vec3 F = k * x * dir;
+    float      k = 4.0f;                 // spring constant
+    float      x = L - restLen;          
+    glm::vec3  F = k * x * dir;
 
     if (!atomA->fixed) atomA->velocity += F / atomA->mass;
     if (!atomB->fixed) atomB->velocity += -F / atomB->mass;
 }
+
 
 void Bond::render( int w, int h ) const {
     if (!atomA || !atomB) return;
