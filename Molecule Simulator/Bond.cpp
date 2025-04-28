@@ -53,19 +53,23 @@ void Bond::render( int w, int h ) const {
     if (fabs( glm::dot( dir, up ) ) > .9f) up = glm::vec3( 1, 0, 0 );
     glm::vec3 right = glm::normalize( glm::cross( dir, up ) ) * 0.15f;
 
+    glm::vec3 bondColor( 0.8f ); // default gray for single bond
+    if (type == BondType::DOUBLE) bondColor = glm::vec3( 0.0f, 1.0f, 0.0f ); // green
+    if (type == BondType::TRIPLE) bondColor = glm::vec3( 0.0f, 0.0f, 1.0f ); // blue
+
     if (type == BondType::SINGLE)
     {
-        Renderer::DrawBondCylinder( A, B, r, w, h );
+        Renderer::DrawBondCylinder( A, B, r, w, h, bondColor );
     }
     else if (type == BondType::DOUBLE)
     {
-        Renderer::DrawBondCylinder( A + right, B + right, r, w, h );
-        Renderer::DrawBondCylinder( A - right, B - right, r, w, h );
+        Renderer::DrawBondCylinder( A + right, B + right, r, w, h, bondColor );
+        Renderer::DrawBondCylinder( A - right, B - right, r, w, h, bondColor );
     }
     else                     // TRIPLE
     {
-        Renderer::DrawBondCylinder( A, B, r, w, h );
-        Renderer::DrawBondCylinder( A + right, B + right, r, w, h );
-        Renderer::DrawBondCylinder( A - right, B - right, r, w, h );
+        Renderer::DrawBondCylinder( A, B, r, w, h, bondColor );
+        Renderer::DrawBondCylinder( A + right, B + right, r, w, h, bondColor );
+        Renderer::DrawBondCylinder( A - right, B - right, r, w, h, bondColor );
     }
 }

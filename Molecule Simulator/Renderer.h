@@ -14,10 +14,7 @@ public:
     static void Shutdown();
 
     static void DrawAtom( const Atom &atom, int windowW, int windowH );
-    static void DrawBondCylinder( const glm::vec3 &A,
-        const glm::vec3 &B,
-        float radius,
-        int windowW, int windowH );
+    static void DrawBondCylinder( const glm::vec3 &A, const glm::vec3 &B, float radius, int windowW, int windowH, const glm::vec3 &color );
     static void DrawArrow( const glm::vec3 &start,
         const glm::vec3 &end,
         const glm::vec3 &color,

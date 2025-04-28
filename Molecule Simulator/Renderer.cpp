@@ -143,7 +143,8 @@ void Renderer::DrawAtom( const Atom &a, int w, int h ) {
 void Renderer::DrawBondCylinder( const glm::vec3 &A,
     const glm::vec3 &B,
     float radius,
-    int w, int h ) {
+    int w, int h,
+    const glm::vec3 &color ) {
     glm::vec3 dir = B - A;
     float len = glm::length( dir );
     glm::vec3 mid = 0.5f * (A + B);
@@ -159,7 +160,7 @@ void Renderer::DrawBondCylinder( const glm::vec3 &A,
     cylinderShader->setMat4( "view", cameraPtr->GetViewMatrix() );
     cylinderShader->setMat4( "projection", proj );
     cylinderShader->setMat4( "model", model );
-    cylinderShader->setVec3( "color", glm::vec3( 0.8f ) );
+    cylinderShader->setVec3( "color", color );
     cylinderMesh.Draw();
 }
 
@@ -171,7 +172,7 @@ void Renderer::DrawArrow( const glm::vec3 &start,
     float len = glm::length( dir );
     if (len < 1e-4f) return;
     glm::vec3 shaftEnd = start + dir * 0.8f;
-    DrawBondCylinder( start, shaftEnd, 0.03f, w, h );
+    DrawBondCylinder( start, shaftEnd, 0.03f, w, h, glm::vec3( 1.0f, 1.0f, 1.0f ) );
 
     glm::vec3 up( 0, 1, 0 );
     if (fabs( glm::dot( glm::normalize( dir ), up ) ) > 0.999f) up = glm::vec3( 1, 0, 0 );
