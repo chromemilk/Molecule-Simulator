@@ -62,7 +62,7 @@ int main() {
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
     glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
     glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-    window = glfwCreateWindow( WIN_W, WIN_H, "Molecule Sim", nullptr, nullptr );
+    window = glfwCreateWindow( WIN_W, WIN_H, "3D Compound Lewis Structure Viewer", nullptr, nullptr );
     if (!window)
     {
         std::cerr << "GLFW failed\n"; return 1;
@@ -111,6 +111,8 @@ int main() {
             10, 50, w, h );
         textRenderer.DrawScreenText( "Correction: " + std::to_string( atoms.latestCorrectionStrength ),
             10, 70, w, h );
+        textRenderer.DrawScreenText( "W-A-S-D to move",
+            10, 110, w, h );
 
         glfwSwapBuffers( window );
         glfwPollEvents();

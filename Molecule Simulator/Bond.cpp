@@ -28,13 +28,26 @@ void Bond::render( int w, int h ) const {
     glm::vec3 B = atomB->position;
 
     glm::vec3 dir = glm::normalize( B - A );
+
+   /*
     A += dir * atomA->radius;   // stop at sphere surface
     B -= dir * atomB->radius;
+    */
 
     float baseR = 0.06f;
     float r = baseR;
     if (type == BondType::DOUBLE) r = baseR * 1.3f;
     if (type == BondType::TRIPLE) r = baseR * 1.5f;
+
+    float insetA = 0.0f;
+    float insetB = 0.0f;
+    // Now it should actually touch the spheres 
+    if (atomA->radius > r) insetA = glm::sqrt( atomA->radius * atomA->radius - r * r );
+    if (atomB->radius > r) insetB = glm::sqrt( atomB->radius * atomB->radius - r * r );
+
+    A += dir * insetA;
+    B -= dir * insetB;
+
 
     glm::vec3 up( 0, 1, 0 );
     if (fabs( glm::dot( dir, up ) ) > .9f) up = glm::vec3( 1, 0, 0 );
