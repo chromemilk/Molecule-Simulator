@@ -58,12 +58,17 @@ void buildHCN( AtomSystem &sys ) {
 }
 
 void buildNO2minus( AtomSystem &sys ) {
-     sys.spawnAtom( "O" );
+    /* sys.spawnAtom("O");
      sys.spawnAtom( "N" );
      sys.spawnAtom( "O" );
 
-    sys.createBond( 1, 0, BondType::DOUBLE );
-    sys.createBond( 1, 2, BondType::SINGLE );   // resonance form
+     sys.createBond( 1, 0, BondType::DOUBLE );
+     sys.createBond( 1, 2, BondType::SINGLE );   // resonance form
+     */
+	                                  
+    sys.build( { "O", "N", "O" }, { {1, 0, 2}, {1, 2 ,1} } );
+    // Template
+	// Atoms -> then bonds where the bonds are a tuple of (atomA, atomB, order)
 }
 
 

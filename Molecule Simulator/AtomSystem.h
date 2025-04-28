@@ -21,6 +21,8 @@ public:
     void updateFormalCharges();
     float computeDipole();   
 
+    void build( const std::vector<std::string> &symbols, const std::vector<std::tuple<int, int, int>> &bonds );
+
     bool isPolar = false;
     float latestCorrectionStrength = 0.0f;
 

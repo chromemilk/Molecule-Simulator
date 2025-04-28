@@ -339,3 +339,18 @@ void AtomSystem::updateFormalCharges() {
         atom.formalCharge = V - 2 * LP - bondPairs;
     }
 }
+
+void AtomSystem::build( const std::vector<std::string> &symbols,
+    const std::vector<std::tuple<int, int, int>> &bondList ) {
+    for (const auto &s : symbols)
+        spawnAtom( s );
+
+    for (const auto &[a, b, order] : bondList)          
+    {
+        BondType t = BondType::SINGLE;
+        if (order == 2) t = BondType::DOUBLE;
+        else if (order == 3) t = BondType::TRIPLE;
+
+        createBond( a, b, t );
+    }
+}
