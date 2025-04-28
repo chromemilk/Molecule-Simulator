@@ -11,6 +11,10 @@ https://github.com/user-attachments/assets/ce91ff1f-9787-4f5e-83ff-46e27470fa9b
 
 
 
+https://github.com/user-attachments/assets/a79641f6-50ad-49c7-9c50-a4042feb9597
+
+
+
 
 ## ✨ Features
 - Electron geometry calculations
@@ -24,6 +28,8 @@ https://github.com/user-attachments/assets/ce91ff1f-9787-4f5e-83ff-46e27470fa9b
 - Grid
 - Uses a flying camera for 360 view of any structure
 - Model interations using Valence Electron Shell Repulsion Theory (dynamically computes lone pair positions using VSEPR theory)
+- Easy to use molecule builder (new)
+- Formal charge calculations (new)
 
 ## 📚 Tech Stack
 - **C++17**
