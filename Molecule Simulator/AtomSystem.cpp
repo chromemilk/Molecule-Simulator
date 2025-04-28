@@ -8,11 +8,13 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
 #include <GLFW/glfw3.h>
+#include <sstream>
+
 
 extern Camera camera;
 extern GLFWwindow *window;
 extern Atom *selectedAtom;
-extern Atom *hoveredAtom;;
+extern Atom *hoveredAtom;
 
 
 AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
@@ -53,6 +55,54 @@ void AtomSystem::render( int w, int h ) {
     for (auto &a : atoms)
     {
         bool isSelected = (&a == selectedAtom) || (&a == hoveredAtom);
+
+       
+        if (hoveredAtom)
+        {
+            const Element &elem = PeriodicTable::Instance().Get( hoveredAtom->type );
+
+            int singleCount = 0, doubleCount = 0, tripleCount = 0;
+            for (const Bond &bond : bonds)
+            {
+                if (bond.atomA == hoveredAtom || bond.atomB == hoveredAtom)
+                {
+                    if (bond.type == BondType::SINGLE) singleCount++;
+                    if (bond.type == BondType::DOUBLE) doubleCount++;
+                    if (bond.type == BondType::TRIPLE) tripleCount++;
+                }
+            }
+
+            float dipoleMagnitude = glm::length( hoveredAtom->polarityDir );
+
+            std::ostringstream oss;
+            oss.precision( 2 );
+            oss << std::fixed;
+            oss << elem.symbol << " (" << elem.atomicNumber << ") " << elem.atomicMass << " u\n";
+            oss << "Electronegativity: " << elem.electronegativity << "\n";
+            oss << "Dipole Magnitude: " << dipoleMagnitude << "\n";
+            oss << "Lone Pairs: " << hoveredAtom->lonePairs << "\n";
+            oss << "Bonds: " << hoveredAtom->bondedAtoms.size() << "\n";
+            if (singleCount) oss << " - Single: " << singleCount << "\n";
+            if (doubleCount) oss << " - Double: " << doubleCount << "\n";
+            if (tripleCount) oss << " - Triple: " << tripleCount << "\n";
+
+            std::string info = oss.str();
+
+            float startX = 10.0f;
+            float startY = 260.0f;
+            float lineSpacing = 20.0f; // adjust based on your font size!
+
+            std::istringstream iss( info );
+            std::string line;
+            int lineNum = 0;
+            while (std::getline( iss, line ))
+            {
+                textRenderer.DrawScreenText( line, startX, startY + lineSpacing * lineNum, w, h );
+                lineNum++;
+            }
+        }
+
+
         Renderer::DrawAtom( a, w, h, isSelected );
 
     }

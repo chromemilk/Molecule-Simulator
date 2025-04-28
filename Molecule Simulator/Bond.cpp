@@ -22,43 +22,42 @@ void Bond::applyForce() {
     if (!atomA->fixed) atomA->velocity += F / atomA->mass;
     if (!atomB->fixed) atomB->velocity += -F / atomB->mass;
 }
-
-
 void Bond::render( int w, int h ) const {
     if (!atomA || !atomB) return;
 
     glm::vec3 A = atomA->position;
     glm::vec3 B = atomB->position;
-
     glm::vec3 dir = glm::normalize( B - A );
 
-   /*
-    A += dir * atomA->radius;   // stop at sphere surface
-    B -= dir * atomB->radius;
-    */
+    float dist = glm::length( B - A );        // current live distance
 
     float baseR = 0.06f;
     float r = baseR;
     if (type == BondType::DOUBLE) r = baseR * 1.3f;
     if (type == BondType::TRIPLE) r = baseR * 1.5f;
 
-    float insetA = 0.0f;
-    float insetB = 0.0f;
-    // Now it should actually touch the spheres 
-    if (atomA->radius > r) insetA = glm::sqrt( atomA->radius * atomA->radius - r * r );
-    if (atomB->radius > r) insetB = glm::sqrt( atomB->radius * atomB->radius - r * r );
+    // calculate inset factor dynamically
+    float insetA = glm::sqrt( glm::max( 0.0f, atomA->radius * atomA->radius - r * r ) );
+    float insetB = glm::sqrt( glm::max( 0.0f, atomB->radius * atomB->radius - r * r ) );
 
+    if (dist > 1e-6f)
+    {
+        insetA = glm::min( insetA, 0.5f * dist );
+        insetB = glm::min( insetB, 0.5f * dist );
+    }
+
+    // inset along direction
     A += dir * insetA;
     B -= dir * insetB;
 
+    // color
+    glm::vec3 bondColor( 0.8f );
+    if (type == BondType::DOUBLE) bondColor = glm::vec3( 0.0f, 1.0f, 0.0f );
+    if (type == BondType::TRIPLE) bondColor = glm::vec3( 0.0f, 0.6f, 1.0f );
 
     glm::vec3 up( 0, 1, 0 );
     if (fabs( glm::dot( dir, up ) ) > .9f) up = glm::vec3( 1, 0, 0 );
     glm::vec3 right = glm::normalize( glm::cross( dir, up ) ) * 0.15f;
-
-    glm::vec3 bondColor( 0.8f ); // default gray for single bond
-    if (type == BondType::DOUBLE) bondColor = glm::vec3( 0.0f, 1.0f, 0.0f ); // green
-    if (type == BondType::TRIPLE) bondColor = glm::vec3( 0.0f, 0.0f, 1.0f ); // blue
 
     if (type == BondType::SINGLE)
     {
@@ -69,10 +68,11 @@ void Bond::render( int w, int h ) const {
         Renderer::DrawBondCylinder( A + right, B + right, r, w, h, bondColor );
         Renderer::DrawBondCylinder( A - right, B - right, r, w, h, bondColor );
     }
-    else                     // TRIPLE
+    else // TRIPLE
     {
         Renderer::DrawBondCylinder( A, B, r, w, h, bondColor );
         Renderer::DrawBondCylinder( A + right, B + right, r, w, h, bondColor );
         Renderer::DrawBondCylinder( A - right, B - right, r, w, h, bondColor );
     }
 }
+
