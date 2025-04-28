@@ -1,14 +1,19 @@
-# 3D Particle Simulator
+# 3D Molecule Simulator
 
-A real-time 3D particle simulation written in modern C++ using OpenGL.
+A real-time 3D simulation written in modern C++ using OpenGL.
 
 ## ✨ Features
-- Particle system with position, velocity, and lifespan
-- Real-time physics updates
-- Basic rendering using OpenGL
-- Modular and extensible C++ structure
-- Easy to expand with new particle behaviors (gravity, collisions, etc.)
-- Model interations using Valence Electron Shell Repulsion Theory 
+- Electron geometry calculations
+- Predicts and dynamically finds bond angles
+- Finds and models lone pairs
+- Uses VSEPR methods to compute geometry
+- Computes dipoles and displays molecule polarity/polarity magnitude
+- Molecule simulations are build on a custom particle engine
+- Extended periodic table for enhanced lookups
+- Loads shaders and creates meshes for full 3D enhancements
+- Grid
+- Uses a flying camera for 360 view of any structure
+- Model interations using Valence Electron Shell Repulsion Theory (dynamically computes lone pair positions using VSEPR theory)
 
 ## 📚 Tech Stack
 - **C++17**
@@ -29,15 +34,14 @@ Make sure you have installed:
 - GLM
 
 ## 🛠️ Planned Features
-- Shader-based particle rendering
-- Gravity and force fields
-- Collisions with planes and spheres
-- Particle emitters
-- GPU compute particles (for millions of particles!)
+- Chemical equation parsing
+- Automatic resonance structure computation
+- Correction stability system (currently structures fly around until ideal angles are reached)
+- Dynamic light shaders with raytracing
+- GUI
 
 ## 🎨 Future Ideas
 - Add a GUI (ImGui) for real-time tweaking
-- Add volumetric effects (smoke, fire, water simulation)
 - Optimizations: spatial partitioning, multithreading
 
 ## 📄 License
@@ -62,6 +66,6 @@ mkdir build
 cd build
 cmake ..
 make
-./ParticleSimulator
+./Molecule Simulator
 
 
