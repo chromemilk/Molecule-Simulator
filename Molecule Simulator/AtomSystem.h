@@ -17,7 +17,8 @@ public:
     void addAtom( const Atom &atom );
     void createBond( int ia, int ib, BondType t = BondType::SINGLE );
 
-    void updateLonePairs();                             
+    void updateLonePairs();  
+    void updateFormalCharges();
     float computeDipole();   
 
     bool isPolar = false;
@@ -29,6 +30,7 @@ private:
     float getIdealBondAngle( const Atom &a );
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> & );
     std::string determineGeometry( const Atom & ) const;
+
 
     unsigned                maxAtoms{};
     std::vector<Atom>       atoms;

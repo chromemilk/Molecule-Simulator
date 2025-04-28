@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "PeriodicTable.h"
 #include "MathUtils.h"
+#include "StringUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
@@ -49,10 +50,19 @@ void AtomSystem::render( int w, int h ) {
         Renderer::DrawAtom( a, w, h );
     }
 
+    /*
     for (auto &a : atoms)
     {
-        textRenderer.DrawText( a.type, a.position, w, h );
+        textRenderer.DrawText( a.type, a.position, w, h);
     }
+    */
+
+    for (Atom &a : atoms)
+    {
+        std::string label = a.type + StringUtils::chargeString(a.formalCharge);
+        textRenderer.DrawText( label, a.position, w, h );
+    }
+
 
     renderBondAngles( w, h );
 
@@ -168,19 +178,20 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
 }
 
 void AtomSystem::updateLonePairs() {
-    for (auto &atom : atoms)
+    for (Atom &atom : atoms)
     {
-        int bondElectronPairs = 0;
-        for (auto &bond : bonds)
-        {
-            if (bond.atomA == &atom || bond.atomB == &atom)
-                bondElectronPairs += bond.bondOrder();
-        }
-        int valence = PeriodicTable::Instance().Get( atom.type ).valenceElectrons;
-        int lonePairElectrons = std::max( 0, valence - bondElectronPairs );
-        atom.lonePairs = lonePairElectrons / 2;
+        int bondOrderSum = 0;
+        for (Bond &b : bonds)
+            if (b.atomA == &atom || b.atomB == &atom)
+                bondOrderSum += b.bondOrder();   // 1,2,3…
+
+        const int desired = (atom.type == "H") ? 2 : 8;
+
+        int nonBondingElectrons = std::max( 0, desired - 2 * bondOrderSum );
+        atom.lonePairs = nonBondingElectrons / 2;
     }
 }
+
 
 float AtomSystem::computeDipole() {
     netDipole = glm::vec3( 0.0f );
@@ -219,7 +230,7 @@ void AtomSystem::computeLonePairPositions(
         glm::normalize( glm::vec3( -1,  1, -1 ) )
     };
 
-    const float centerOffset = 0.04f;        // how far above the sphere
+    const float centerOffset = 0.f;        // how far above the sphere
   
     for (Atom &atom : atoms)
     {
@@ -260,7 +271,7 @@ void AtomSystem::computeLonePairPositions(
                     lpDirs.push_back( tetraDirs[ j ] );
         }
 
-        float spread = atom.radius * 1.5f;  // tweak to taste
+        float spread = atom.radius * 0.9f;  // tweak to taste
         float baseR = atom.radius + centerOffset;
         for (auto dir : lpDirs)
         {
@@ -311,4 +322,20 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
         if (lp == 2) return "Bent";
     }
     return "unknown";
+}
+
+void AtomSystem::updateFormalCharges() {
+    for (Atom &atom : atoms)
+    {
+        /* count electron PAIRS in bonds to this atom */
+        int bondPairs = 0;
+        for (Bond &b : bonds)
+            if (b.atomA == &atom || b.atomB == &atom)
+                bondPairs += b.bondOrder();   // 1, 2 or 3
+
+        int V = PeriodicTable::Instance().Get( atom.type ).valenceElectrons;
+        int LP = atom.lonePairs;              // already known
+
+        atom.formalCharge = V - 2 * LP - bondPairs;
+    }
 }

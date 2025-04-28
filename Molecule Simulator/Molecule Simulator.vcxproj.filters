@@ -37,6 +37,9 @@
     <Filter Include="Source Files\meshes">
       <UniqueIdentifier>{7569e95f-7ab8-44b8-b4dd-734e69f14a27}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\strings">
+      <UniqueIdentifier>{96b10dc8-30e2-4bd2-918a-713374c766b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Molecule Simulator.cpp">
@@ -83,6 +86,9 @@
     </ClCompile>
     <ClCompile Include="Mesh.cpp">
       <Filter>Source Files\meshes</Filter>
+    </ClCompile>
+    <ClCompile Include="StringUtils.cpp">
+      <Filter>Source Files\strings</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -133,6 +139,9 @@
     </ClInclude>
     <ClInclude Include="Mesh.h">
       <Filter>Source Files\meshes</Filter>
+    </ClInclude>
+    <ClInclude Include="StringUtils.h">
+      <Filter>Source Files\strings</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

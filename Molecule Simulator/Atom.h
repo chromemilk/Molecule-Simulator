@@ -15,6 +15,7 @@ public:
     float radius;             // Radius (for rendering size)
     bool fixed = false;       // If true, atom doesn't move
     int lonePairs = 0;
+	int formalCharge = 0; // Formal charge
 
     std::vector<Atom *> bondedAtoms; // List of atoms this atom is bonded to
 

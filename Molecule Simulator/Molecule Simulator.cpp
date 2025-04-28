@@ -57,6 +57,16 @@ void buildHCN( AtomSystem &sys ) {
     sys.createBond( 1, 2, BondType::TRIPLE );
 }
 
+void buildNO2minus( AtomSystem &sys ) {
+     sys.spawnAtom( "O" );
+     sys.spawnAtom( "N" );
+     sys.spawnAtom( "O" );
+
+    sys.createBond( 1, 0, BondType::DOUBLE );
+    sys.createBond( 1, 2, BondType::SINGLE );   // resonance form
+}
+
+
 int main() {
     glfwInit();
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
@@ -82,9 +92,9 @@ int main() {
     textRenderer.Init();
 
     // CAN CHANGE
-    buildHCN( atoms );
+    //buildHCN( atoms );
+	buildNO2minus( atoms );
 
-    atoms.updateLonePairs();
 
     while (!glfwWindowShouldClose( window ))
     {
@@ -102,14 +112,17 @@ int main() {
 
         Renderer::DrawGrid( w, h );
 
+        atoms.updateLonePairs();
+        atoms.updateFormalCharges();
+
         atoms.render( w, h );
 
         float mag = atoms.computeDipole();
-        textRenderer.DrawScreenText( "HCN -- Polarity: " + std::string( atoms.isPolar ? "Polar" : "Non-Polar" ),
+        textRenderer.DrawScreenText( "NO2- -- Polarity: " + std::string( atoms.isPolar ? "Polar" : "Non-Polar" ),
             10, 30, w, h );
         textRenderer.DrawScreenText( "Dipole Magnitude: " + std::to_string( mag ),
             10, 50, w, h );
-        textRenderer.DrawScreenText( "Correction: " + std::to_string( atoms.latestCorrectionStrength ),
+        textRenderer.DrawScreenText( "Adjustment Magnitude: " + std::to_string( atoms.latestCorrectionStrength ),
             10, 70, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move",
             10, 110, w, h );
