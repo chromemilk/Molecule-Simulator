@@ -26,30 +26,158 @@ std::string currentPrebuiltAtom = "NA";
 TextRenderer textRenderer;
 AtomSystem atoms(100, textRenderer);
 
+// More user interactivity 
+Atom *selectedAtom = nullptr;
+bool dragging = false;
+
+enum class ControlMode
+{
+    FLY_CAMERA, PICK_DRAG
+};
+ControlMode currentMode = ControlMode::FLY_CAMERA;
+
+
+Atom *PickAtom( int mouseX, int mouseY, int windowWidth, int windowHeight, const std::vector<Atom> &atoms ) {
+    // Convert mouse screen position to normalized device coordinates
+    float ndcX = (2.0f * mouseX) / windowWidth - 1.0f;
+    float ndcY = 1.0f - (2.0f * mouseY) / windowHeight;
+    glm::vec4 rayClip = glm::vec4( ndcX, ndcY, -1.0f, 1.0f );
+
+    glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ), (float)windowWidth / (float)windowHeight, 0.1f, 100.0f );
+    glm::mat4 invProj = glm::inverse( proj );
+    glm::vec4 rayEye = invProj * rayClip;
+    rayEye = glm::vec4( rayEye.x, rayEye.y, -1.0f, 0.0f );
+
+    glm::mat4 invView = glm::inverse( camera.GetViewMatrix() );
+    glm::vec3 rayWorld = glm::normalize( glm::vec3( invView * rayEye ) );
+
+    glm::vec3 rayOrigin = camera.Position;
+
+    Atom *closest = nullptr;
+    float minDist = 99999.0f;
+
+    for (const auto &atom : atoms)
+    {
+        glm::vec3 toAtom = atom.position - rayOrigin;
+        float t = glm::dot( toAtom, rayWorld );
+        glm::vec3 closestPoint = rayOrigin + rayWorld * t;
+        float distToCenter = glm::length( closestPoint - atom.position );
+
+        if (distToCenter < atom.radius && t > 0.0f)
+        {
+            if (t < minDist)
+            {
+                minDist = t;
+                closest = const_cast<Atom *>( &atom );
+            }
+        }
+    }
+
+    return closest;
+}
+
+
 // callbacks
 void framebuffer_size_callback(GLFWwindow*, int w, int h) {
     glViewport(0, 0, w, h);
 }
-void mouse_callback(GLFWwindow*, double xpos, double ypos) {
+
+
+void mouse_callback( GLFWwindow *window, double xpos, double ypos ) {
     if (firstMouse)
     {
         lastX = xpos; lastY = ypos; firstMouse = false;
     }
+
     float xoff = xpos - lastX;
     float yoff = lastY - ypos;
     lastX = xpos; lastY = ypos;
-    camera.ProcessMouseMovement(xoff, yoff);
+
+    if (currentMode == ControlMode::FLY_CAMERA)
+    {
+        camera.ProcessMouseMovement( xoff, yoff );
+    }
+    else if (dragging && selectedAtom)
+    {
+        // dragging behavior (already correct)
+        float depth = glm::length( selectedAtom->position - camera.Position );
+        glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ), (float)WIN_W / WIN_H, 0.1f, 100.0f );
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 VP = proj * view;
+        glm::mat4 invVP = glm::inverse( VP );
+
+        float ndcX = (2.0f * xpos) / WIN_W - 1.0f;
+        float ndcY = 1.0f - (2.0f * ypos) / WIN_H;
+        glm::vec4 ndcPos = glm::vec4( ndcX, ndcY, 1.0f, 1.0f );
+        glm::vec4 worldPos = invVP * ndcPos;
+        worldPos /= worldPos.w;
+        glm::vec3 newDir = glm::normalize( glm::vec3( worldPos ) - camera.Position );
+
+        selectedAtom->position = camera.Position + newDir * depth;
+        selectedAtom->velocity = glm::vec3( 0.0f );
+    }
 }
+
+
+void mouse_button_callback( GLFWwindow *window, int button, int action, int mods ) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        double xpos, ypos;
+        glfwGetCursorPos( window, &xpos, &ypos );
+        selectedAtom = PickAtom( (int)xpos, (int)ypos, WIN_W, WIN_H, atoms.getAtoms() ); // Need a `getAtoms()` accessor
+        dragging = (selectedAtom != nullptr);
+    }
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    {
+        dragging = false;
+        selectedAtom = nullptr;
+    }
+}
+
+
+
+
 void scroll_callback(GLFWwindow*, double, double yoff) {
     camera.ProcessMouseScroll((float)yoff);
 }
-void processInput(GLFWwindow* w) {
-    if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(w, true);
-    if (glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS) camera.ProcessKeyboard(Camera_Movement::FORWARD, deltaTime);
-    if (glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS) camera.ProcessKeyboard(Camera_Movement::BACKWARD, deltaTime);
-    if (glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS) camera.ProcessKeyboard(Camera_Movement::LEFT, deltaTime);
-    if (glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS) camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
+
+void processInput( GLFWwindow *w ) {
+    static bool tabPressedLastFrame = false;
+
+    if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS) glfwSetWindowShouldClose( w, true );
+
+    if (currentMode == ControlMode::FLY_CAMERA)
+    {
+        if (glfwGetKey( w, GLFW_KEY_W ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::FORWARD, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_S ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::BACKWARD, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_A ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::LEFT, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_D ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::RIGHT, deltaTime );
+    }
+
+    if (glfwGetKey( w, GLFW_KEY_TAB ) == GLFW_PRESS)
+    {
+        if (!tabPressedLastFrame)
+        { // Only toggle once per actual press
+            if (currentMode == ControlMode::FLY_CAMERA)
+            {
+                currentMode = ControlMode::PICK_DRAG;
+                glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_NORMAL );
+            }
+            else
+            {
+                currentMode = ControlMode::FLY_CAMERA;
+                glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
+            }
+        }
+        tabPressedLastFrame = true;
+    }
+    else
+    {
+        tabPressedLastFrame = false;
+    }
 }
+
+
 
 void buildHCN(AtomSystem& sys) {
     sys.spawnAtom("H"); //0
@@ -127,6 +255,7 @@ int main() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback( window, mouse_button_callback );
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -181,7 +310,7 @@ int main() {
             10, 190, w, h);
         textRenderer.DrawScreenText("Simulation Stability: " + std::to_string(1 - (0.5 * atoms.latestCorrectionStrength)),
             10, 210, w, h);
-        textRenderer.DrawScreenText("W-A-S-D to move",
+        textRenderer.DrawScreenText("W-A-S-D to move, TAB to toggle",
             10, 230, w, h);
 
         glfwSwapBuffers(window);

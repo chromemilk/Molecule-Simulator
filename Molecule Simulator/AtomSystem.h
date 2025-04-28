@@ -35,6 +35,11 @@ public:
     int sigmaBonds = 0;
     int piBonds = 0;
 
+    const std::vector<Atom> &getAtoms() const {
+        return atoms;
+    }
+
+
 
 private:
     void applyVSEPRForces( float dt );
