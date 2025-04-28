@@ -11,6 +11,9 @@
 
 extern Camera camera;
 extern GLFWwindow *window;
+extern Atom *selectedAtom;
+extern Atom *hoveredAtom;;
+
 
 AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
     : maxAtoms( maxAtoms ), textRenderer( tr ) {
@@ -50,8 +53,11 @@ void AtomSystem::render( int w, int h ) {
 
     for (auto &a : atoms)
     {
-        Renderer::DrawAtom( a, w, h );
+        bool isSelected = (&a == selectedAtom) || (&a == hoveredAtom);
+        Renderer::DrawAtom( a, w, h, isSelected );
+
     }
+
 
     /*
     for (auto &a : atoms)

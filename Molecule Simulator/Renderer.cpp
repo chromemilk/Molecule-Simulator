@@ -123,8 +123,7 @@ void Renderer::DrawGrid( int w, int h ) {
     gridMesh.Draw();
 }
 
-
-void Renderer::DrawAtom( const Atom &a, int w, int h ) {
+void Renderer::DrawAtom( const Atom &a, int w, int h, bool highlight ) {
     glm::mat4 proj = glm::perspective( glm::radians( 45.0f ),
         (float)w / (float)h, 0.1f, 100.0f );
     glm::mat4 model = glm::translate( glm::mat4( 1 ), a.position )
@@ -135,10 +134,14 @@ void Renderer::DrawAtom( const Atom &a, int w, int h ) {
     sphereShader->setMat4( "projection", proj );
     sphereShader->setMat4( "model", model );
     sphereShader->setVec3( "color", a.color );
-    sphereShader->setVec3( "lightPos", glm::vec3( 5.0f, 5.0f, 5.0f ) ); // Example light
+
+    sphereShader->setFloat( "emissiveBoost", highlight ? 1.0f : 0.0f );
+
+    sphereShader->setVec3( "lightPos", glm::vec3( 5.0f, 5.0f, 5.0f ) );
     sphereShader->setVec3( "viewPos", cameraPtr->Position );
     sphereMesh.Draw();
 }
+
 
 void Renderer::DrawBondCylinder( const glm::vec3 &A,
     const glm::vec3 &B,

@@ -29,6 +29,8 @@ AtomSystem atoms(100, textRenderer);
 // More user interactivity 
 Atom *selectedAtom = nullptr;
 bool dragging = false;
+Atom *hoveredAtom = nullptr;
+
 
 enum class ControlMode
 {
@@ -116,6 +118,14 @@ void mouse_callback( GLFWwindow *window, double xpos, double ypos ) {
         selectedAtom->position = camera.Position + newDir * depth;
         selectedAtom->velocity = glm::vec3( 0.0f );
     }
+
+    if (currentMode == ControlMode::PICK_DRAG && !dragging)
+    {
+        int w, h;
+        glfwGetFramebufferSize( window, &w, &h );
+        hoveredAtom = PickAtom( (int)lastX, (int)lastY, w, h, atoms.getAtoms() );
+    }
+
 }
 
 

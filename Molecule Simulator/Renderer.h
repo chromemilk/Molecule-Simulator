@@ -13,7 +13,7 @@ public:
     static void Init( Camera *cam );
     static void Shutdown();
 
-    static void DrawAtom( const Atom &atom, int windowW, int windowH );
+    static void DrawAtom( const Atom &atom, int windowW, int windowH, bool highlight = false );
     static void DrawBondCylinder( const glm::vec3 &A, const glm::vec3 &B, float radius, int windowW, int windowH, const glm::vec3 &color );
     static void DrawArrow( const glm::vec3 &start,
         const glm::vec3 &end,
