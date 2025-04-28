@@ -28,6 +28,14 @@ public:
     bool isPolar = false;
     float latestCorrectionStrength = 0.0f;
 
+
+    int singleBonds = 0;
+    int doubleBonds = 0;
+    int tripleBonds = 0;
+    int sigmaBonds = 0;
+    int piBonds = 0;
+
+
 private:
     void applyVSEPRForces( float dt );
     void renderBondAngles( int w, int h );

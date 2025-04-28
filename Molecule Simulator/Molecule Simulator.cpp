@@ -169,8 +169,20 @@ int main() {
             10, 50, w, h);
         textRenderer.DrawScreenText("Adjustment Magnitude: " + std::to_string(atoms.latestCorrectionStrength),
             10, 70, w, h);
-        textRenderer.DrawScreenText("W-A-S-D to move",
+        textRenderer.DrawScreenText("Single Bonds: " + std::to_string(atoms.singleBonds),
             10, 110, w, h);
+        textRenderer.DrawScreenText("Double Bonds: " + std::to_string(atoms.doubleBonds),
+            10, 130, w, h);
+        textRenderer.DrawScreenText("Triple Bonds: " + std::to_string(atoms.tripleBonds),
+            10, 150, w, h);
+        textRenderer.DrawScreenText("Sigma Bonds: " + std::to_string(atoms.sigmaBonds),
+            10, 170, w, h);
+        textRenderer.DrawScreenText("Pi Bonds: " + std::to_string(atoms.piBonds),
+            10, 190, w, h);
+        textRenderer.DrawScreenText("Simulation Stability: " + std::to_string(1 - (0.5 * atoms.latestCorrectionStrength)),
+            10, 210, w, h);
+        textRenderer.DrawScreenText("W-A-S-D to move",
+            10, 230, w, h);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

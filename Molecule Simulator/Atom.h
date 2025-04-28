@@ -18,6 +18,7 @@ public:
 	int formalCharge = 0; // Formal charge
     glm::vec3 polarityDir{ 0.f }; // Gives the direction in 3D space
 
+
     std::vector<Atom *> bondedAtoms; // List of atoms this atom is bonded to
 
     Atom( const std::string &type, const glm::vec3 &pos, float mass );

@@ -359,9 +359,23 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
 
     for (const auto &[a, b, order] : bondList)          
     {
+        // Sigma bonds are either the second or third bonds in the bonding group
         BondType t = BondType::SINGLE;
-        if (order == 2) t = BondType::DOUBLE;
-        else if (order == 3) t = BondType::TRIPLE;
+        if (order == 1) {
+            singleBonds++;
+        }
+        if (order == 2) { 
+            t = BondType::DOUBLE;
+            sigmaBonds++;
+            piBonds++;
+            doubleBonds++;
+        } 
+        else if (order == 3) { 
+            t = BondType::TRIPLE; 
+            sigmaBonds++;
+            piBonds += 2;
+            tripleBonds++;
+        }
 
         createBond( a, b, t );
     }
