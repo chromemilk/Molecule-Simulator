@@ -1,6 +1,10 @@
+// AtomSystem.h
 #pragma once
+
 #include <vector>
 #include <unordered_map>
+#include <tuple>
+#include <string>
 #include "Atom.h"
 #include "Bond.h"
 #include "TextRenderer.h"
@@ -17,46 +21,49 @@ public:
     void addAtom( const Atom &atom );
     void createBond( int ia, int ib, BondType t = BondType::SINGLE );
 
-    void updateLonePairs();  
+    void updateLonePairs();
     void updateFormalCharges();
-    float computeDipole();   
+    float computeDipole();
 
     void updatePolarities();
 
-    void build( const std::vector<std::string> &symbols, const std::vector<std::tuple<int, int, int>> &bonds );
+    void build( const std::vector<std::string> &symbols,
+        const std::vector<std::tuple<int, int, int>> &bonds );
 
-    bool isPolar = false;
-    float latestCorrectionStrength = 0.0f;
+    bool     isPolar = false;
+    float    latestCorrectionStrength = 0.f;
+    int      singleBonds = 0;
+    int      doubleBonds = 0;
+    int      tripleBonds = 0;
+    int      sigmaBonds = 0;
+    int      piBonds = 0;
 
-
-    int singleBonds = 0;
-    int doubleBonds = 0;
-    int tripleBonds = 0;
-    int sigmaBonds = 0;
-    int piBonds = 0;
-
-    const std::vector<Atom> &getAtoms() const {
+    const std::vector<Atom> &getAtoms()     const {
         return atoms;
     }
+    const std::vector<Atom> &getLonePairs() const {
+        return lonePairAtoms;
+    }
+    const std::vector<Bond> &getBonds()     const {
+        return bonds;
+    }
 
+    std::vector<Bond>          bonds;
 
 
 private:
     void applyVSEPRForces( float dt );
     void renderBondAngles( int w, int h );
     float getIdealBondAngle( const Atom &a );
-    void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> & );
+    void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
     std::string determineGeometry( const Atom & ) const;
 
-
-    unsigned                maxAtoms{};
-    std::vector<Atom>       atoms;
-    std::vector<Bond>       bonds;
+    unsigned                   maxAtoms{ 0 };
+    std::vector<Atom>          atoms;
+    std::vector<Atom>          lonePairAtoms;      // persistent store of LP-dots
     TextRenderer &textRenderer;
-    std::string             firstCentralGeometry{};
+    std::string                firstCentralGeometry;
 
-    glm::vec3 netDipole{ 0.0f };   
-    float     dipoleMag{ 0.0f };   
-
-
+    glm::vec3                  netDipole{ 0.f };
+    float                      dipoleMag{ 0.f };
 };

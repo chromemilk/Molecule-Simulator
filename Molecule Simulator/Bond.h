@@ -19,6 +19,8 @@ public:
         return static_cast<int>(type);
     }
 
+    bool contains( const glm::vec3 &rayO, const glm::vec3 &rayDir ) const;
+
     Atom *atomA{};
     Atom *atomB{};
     BondType type{ BondType::SINGLE };

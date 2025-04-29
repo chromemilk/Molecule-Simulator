@@ -33,20 +33,21 @@ void AtomSystem::update( float dt ) {
     updatePolarities();       
 
 }
-void AtomSystem::render( int w, int h ) {
 
+
+void AtomSystem::render( int w, int h ) {
+    // determine first?central geometry once
     if (firstCentralGeometry.empty())
     {
         for (auto &a : atoms)
-        {
             if (a.bondedAtoms.size() >= 2 || a.lonePairs > 0)
             {
                 firstCentralGeometry = determineGeometry( a );
                 break;
             }
-        }
     }
 
+    // draw bonds
     for (auto &b : bonds)
     {
         b.render( w, h );
@@ -54,115 +55,76 @@ void AtomSystem::render( int w, int h ) {
 
     for (auto &a : atoms)
     {
-        bool isSelected = (&a == selectedAtom) || (&a == hoveredAtom);
-
-       
-        if (hoveredAtom)
-        {
-            const Element &elem = PeriodicTable::Instance().Get( hoveredAtom->type );
-
-            int singleCount = 0, doubleCount = 0, tripleCount = 0;
-            for (const Bond &bond : bonds)
-            {
-                if (bond.atomA == hoveredAtom || bond.atomB == hoveredAtom)
-                {
-                    if (bond.type == BondType::SINGLE) singleCount++;
-                    if (bond.type == BondType::DOUBLE) doubleCount++;
-                    if (bond.type == BondType::TRIPLE) tripleCount++;
-                }
-            }
-
-            float dipoleMagnitude = glm::length( hoveredAtom->polarityDir );
-
-            std::ostringstream oss;
-            oss.precision( 2 );
-            oss << std::fixed;
-            oss << elem.symbol << " (" << elem.atomicNumber << ") " << elem.atomicMass << " u\n";
-            oss << "Electronegativity: " << elem.electronegativity << "\n";
-            oss << "Dipole Magnitude: " << dipoleMagnitude << "\n";
-            oss << "Lone Pairs: " << hoveredAtom->lonePairs << "\n";
-            oss << "Bonds: " << hoveredAtom->bondedAtoms.size() << "\n";
-            if (singleCount) oss << " - Single: " << singleCount << "\n";
-            if (doubleCount) oss << " - Double: " << doubleCount << "\n";
-            if (tripleCount) oss << " - Triple: " << tripleCount << "\n";
-
-            std::string info = oss.str();
-
-            float startX = 10.0f;
-            float startY = 260.0f;
-            float lineSpacing = 20.0f; // adjust based on your font size!
-
-            std::istringstream iss( info );
-            std::string line;
-            int lineNum = 0;
-            while (std::getline( iss, line ))
-            {
-                textRenderer.DrawScreenText( line, startX, startY + lineSpacing * lineNum, w, h );
-                lineNum++;
-            }
-        }
-
-
-        Renderer::DrawAtom( a, w, h, isSelected );
-
+        bool isSel = (&a == selectedAtom) || (&a == hoveredAtom);
+        Renderer::DrawAtom( a, w, h, isSel );
     }
 
+    if (hoveredAtom)
+    {
+        const Element &e = PeriodicTable::Instance().Get( hoveredAtom->type );
+        int s = 0, d = 0, t = 0;
+        for (auto &b : bonds)
+            if (b.atomA == hoveredAtom || b.atomB == hoveredAtom)
+            {
+                if (b.type == BondType::SINGLE) ++s;
+                if (b.type == BondType::DOUBLE) ++d;
+                if (b.type == BondType::TRIPLE) ++t;
+            }
+        float mu = glm::length( hoveredAtom->polarityDir );
 
-    /*
+        std::ostringstream oss;
+        oss << e.symbol << " (" << e.atomicNumber << ") " << e.atomicMass << " u\n"
+            << "EN: " << e.electronegativity << "\n"
+            << "Dipole: " << mu << "\n"
+            << "LonePairs: " << hoveredAtom->lonePairs << "\n"
+            << "Bonds: " << hoveredAtom->bondedAtoms.size() << "\n";
+        if (s) oss << " - Single: " << s << "\n";
+        if (d) oss << " - Double: " << d << "\n";
+        if (t) oss << " - Triple: " << t << "\n";
+
+        float sx = 10, sy = 260, dy = 20; int line = 0;
+        std::istringstream iss( oss.str() );
+        std::string ln;
+        while (std::getline( iss, ln ))
+        {
+            textRenderer.DrawScreenText( ln, sx, sy + line * dy, w, h );
+            ++line;
+        }
+    }
+
     for (auto &a : atoms)
     {
-        textRenderer.DrawText( a.type, a.position, w, h);
+        std::string lbl = a.type + StringUtils::chargeString( a.formalCharge );
+        textRenderer.DrawText( lbl, a.position, w, h );
     }
-    */
-
-    for (Atom &a : atoms)
+    if (!firstCentralGeometry.empty())
     {
-        std::string label = a.type + StringUtils::chargeString(a.formalCharge);
-        textRenderer.DrawText( label, a.position, w, h );
+        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry, 10, 90, w, h );
     }
 
-
-    renderBondAngles( w, h );
-
-    // Lone pairs as smaller spheres 
-    std::unordered_map<Atom *, std::vector<glm::vec3>> lp;
-    computeLonePairPositions( lp );
-
-    for (auto &kv : lp)
+    std::unordered_map<Atom *, std::vector<glm::vec3>> lpmap;
+    computeLonePairPositions( lpmap );
+    for (auto &kv : lpmap)
         for (auto &pos : kv.second)
         {
-            Atom dot( "LP", pos, 1.f );
-            dot.radius = 0.08f;
-            dot.color = glm::vec3( 0.7f, 0.7f, 1.0f );
-			// Make lone pairs semi-transparent
+            Atom dot( "LP", pos, 0.1f );
+            dot.radius = 0.08f; dot.color = glm::vec3( 0.7f, 0.7f, 1.f );
             glEnable( GL_BLEND );
             glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
             glDepthMask( GL_FALSE );
-
             Renderer::DrawAtom( dot, w, h );
         }
-    	// Disable trasparency for the rest
-        glDisable( GL_BLEND );
-        glDepthMask( GL_TRUE );
+    glDisable( GL_BLEND );
+    glDepthMask( GL_TRUE );
 
-
-    // Molecule geometry
-    if (!firstCentralGeometry.empty())
+    for (auto &a : atoms)
     {
-        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry,
-            10, 90, w, h );
+        glm::vec3 st = a.position + glm::vec3( 0, a.radius + 0.1f, 0 );
+        glm::vec3 en = st + a.polarityDir * 0.5f;
+        Renderer::DrawArrow( st, en, glm::vec3( 1, 0, 0 ), w, h );
     }
-
-
-    // draw a little red arrow above each atom showing its local dipole
-    for (const Atom& a : atoms) {
-        glm::vec3 start = a.position + glm::vec3(0.0f, a.radius + 0.1f, 0.0f);
-        glm::vec3 end = start + a.polarityDir * 0.5f;   // adjust length 
-        Renderer::DrawArrow(start, end, glm::vec3(1.0f, 0.0f, 0.0f), w, h);
-    }
-
-
 }
+
 
 
 void AtomSystem::spawnAtom( const std::string &type ) {
@@ -253,21 +215,23 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
     }
 }
 
+// TODO: expanded octet
 void AtomSystem::updateLonePairs() {
-    for (Atom &atom : atoms)
+    auto &pt = PeriodicTable::Instance();
+
+    for (Atom &a : atoms)
     {
-        int bondOrderSum = 0;
+        int bondedElectrons = 0;
         for (Bond &b : bonds)
-            if (b.atomA == &atom || b.atomB == &atom)
-                bondOrderSum += b.bondOrder();   // 1,2,3…
+            if (b.atomA == &a || b.atomB == &a)
+                bondedElectrons += 2 * b.bondOrder();           
 
-        const int desired = (atom.type == "H") ? 2 : 8;
+        int desired = (a.type == "H") ? 2 : 8;
 
-        int nonBondingElectrons = std::max( 0, desired - 2 * bondOrderSum );
-        atom.lonePairs = nonBondingElectrons / 2;
+        int remaining = std::max( 0, desired - bondedElectrons );
+        a.lonePairs = remaining / 2;
     }
 }
-
 
 float AtomSystem::computeDipole() {
     netDipole = glm::vec3( 0.0f );
@@ -294,6 +258,7 @@ float AtomSystem::computeDipole() {
 void AtomSystem::computeLonePairPositions(
     std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
     out.clear();
+    lonePairAtoms.clear();
 
     static const glm::vec3 tetraDirs[ 4 ] = {
         glm::normalize( glm::vec3( 1,  1,  1 ) ),
@@ -302,18 +267,20 @@ void AtomSystem::computeLonePairPositions(
         glm::normalize( glm::vec3( -1,  1, -1 ) )
     };
 
-    const float centerOffset = 0.f;        // how far above the sphere
-  
+    const float centreOffset = 0.0f;   // raise LPs above the sphere surface
+    const float spreadFactor = 0.9f;   // lateral offset for the “pair” dots
+
     for (Atom &atom : atoms)
     {
         int LP = atom.lonePairs;
         if (LP <= 0) continue;
 
-        std::vector<glm::vec3> lpDirs;
-        int B = int( atom.bondedAtoms.size() );
-        int groups = B + LP;
 
-        if (groups <= 3)
+        std::vector<glm::vec3> lpDirs;
+        int bonded = (int)atom.bondedAtoms.size();
+        int groups = bonded + LP;
+
+        if (groups <= 3)      // trigonal planar or linear situations
         {
             for (int i = 0; i < LP; ++i)
             {
@@ -321,7 +288,7 @@ void AtomSystem::computeLonePairPositions(
                 lpDirs.emplace_back( cos( ang ), sin( ang ), 0.0f );
             }
         }
-        else
+        else                  // use remaining corners of a tetrahedron
         {
             bool used[ 4 ] = { false,false,false,false };
             for (Atom *nb : atom.bondedAtoms)
@@ -338,25 +305,35 @@ void AtomSystem::computeLonePairPositions(
                 }
                 if (idx >= 0) used[ idx ] = true;
             }
-            for (int j = 0; j < 4 && int( lpDirs.size() ) < LP; ++j)
-                if (!used[ j ])
-                    lpDirs.push_back( tetraDirs[ j ] );
+            for (int j = 0; j < 4 && (int)lpDirs.size() < LP; ++j)
+                if (!used[ j ]) lpDirs.push_back( tetraDirs[ j ] );
         }
 
-        float spread = atom.radius * 0.9f;  // tweak to taste
-        float baseR = atom.radius + centerOffset;
-        for (auto dir : lpDirs)
+        for (glm::vec3 dir : lpDirs)
         {
             dir = glm::normalize( dir );
-            glm::vec3 ref = (fabs( dir.y ) < 0.99f)
-                ? glm::vec3( 0, 1, 0 )
-                : glm::vec3( 1, 0, 0 );
+            glm::vec3 ref = (fabs( dir.y ) < 0.99f) ? glm::vec3( 0, 1, 0 ) : glm::vec3( 1, 0, 0 );
             glm::vec3 perp = glm::normalize( glm::cross( dir, ref ) );
+
+            float baseR = atom.radius + centreOffset;
+            float spread = atom.radius * spreadFactor;
 
             glm::vec3 centre = atom.position + dir * baseR;
 
-            out[ &atom ].push_back( centre + perp * spread );
-            out[ &atom ].push_back( centre - perp * spread );
+            glm::vec3 p1 = centre + perp * spread;
+            glm::vec3 p2 = centre - perp * spread;
+
+            out[ &atom ].push_back( p1 );
+            out[ &atom ].push_back( p2 );
+
+            Atom dot1( "LP", p1, 0.1f );
+            dot1.radius = 0.08f;
+            dot1.color = glm::vec3( 0.7f, 0.7f, 1.0f );
+            lonePairAtoms.push_back( dot1 );
+
+            Atom dot2 = dot1;
+            dot2.position = p2;
+            lonePairAtoms.push_back( dot2 );
         }
     }
 }
@@ -414,32 +391,60 @@ void AtomSystem::updateFormalCharges() {
 
 void AtomSystem::build( const std::vector<std::string> &symbols,
     const std::vector<std::tuple<int, int, int>> &bondList ) {
+    // fresh start
+    atoms.clear();
+    bonds.clear();
+    firstCentralGeometry.clear();
+    singleBonds = doubleBonds = tripleBonds = sigmaBonds = piBonds = 0;
+
     for (const auto &s : symbols)
         spawnAtom( s );
 
-    for (const auto &[a, b, order] : bondList)          
+    for (const auto &[a, b, order] : bondList)
     {
-        // Sigma bonds are either the second or third bonds in the bonding group
         BondType t = BondType::SINGLE;
-        if (order == 1) {
-            sigmaBonds++;
-            singleBonds++;
+        if (order == 2) t = BondType::DOUBLE;
+        else if (order == 3) t = BondType::TRIPLE;
+
+        // running counts
+        if (order == 1)
+        {
+            singleBonds++;  sigmaBonds++;
         }
-        else if (order == 2) { 
-            t = BondType::DOUBLE;
-            sigmaBonds++;
-            piBonds++;
-            doubleBonds++;
-        } 
-        else if (order == 3) { 
-            t = BondType::TRIPLE; 
-            sigmaBonds++;
-            piBonds += 2;
-            tripleBonds++;
+        if (order == 2)
+        {
+            doubleBonds++;  sigmaBonds++; piBonds++;
+        }
+        if (order == 3)
+        {
+            tripleBonds++;  sigmaBonds++; piBonds += 2;
         }
 
         createBond( a, b, t );
     }
+
+    glm::vec3 com( 0.0f );
+    float     totalM = 0.0f;
+    for (const Atom &a : atoms)
+    {
+        com += a.mass * a.position; totalM += a.mass;
+    }
+    if (totalM > 0.0f) com /= totalM;
+
+    for (Atom &a : atoms)
+        a.position -= com;
+
+    glm::vec3 P( 0.0f );                      // net linear momentum
+    for (const Atom &a : atoms)
+        P += a.mass * a.velocity;
+
+    glm::vec3 vCM = (totalM > 0.0f) ? P / totalM : glm::vec3( 0.0f );
+    for (Atom &a : atoms)
+        a.velocity -= vCM;
+
+    // kill residual angular velocity for a calm start
+    for (Atom &a : atoms)
+        a.velocity = glm::vec3( 0.0f );
 }
 
 

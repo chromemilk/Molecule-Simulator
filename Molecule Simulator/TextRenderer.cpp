@@ -36,7 +36,7 @@ void TextRenderer::Init() {
     uniColor = glGetUniformLocation( textProgram, "uColor" );
 }
 
-void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight ) {
+void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight, float alpha ) {
     glm::mat4 V = camera.GetViewMatrix();
     glm::mat4 P = glm::perspective( glm::radians( camera.Zoom ),
         float( windowWidth ) / windowHeight,
@@ -68,8 +68,7 @@ void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos,
     glUseProgram( textProgram );
     glm::mat4 ortho = glm::ortho( 0.0f, (float)windowWidth, (float)windowHeight, 0.0f ); // top-left origin
     glUniformMatrix4fv( uniOrtho, 1, GL_FALSE, glm::value_ptr( ortho ) );
-    glUniform3f( uniColor, 1.0f, 1.0f, 1.0f );
-
+    glUniform4f( uniColor, 1, 1, 1, alpha );
     glBindVertexArray( textVAO );
     for (int i = 0; i < quads; ++i)
         glDrawArrays( GL_TRIANGLE_FAN, i * 4, 4 );
@@ -84,7 +83,7 @@ void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos,
 
 
 
-void TextRenderer::DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight ) {
+void TextRenderer::DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight, float alpha ) {
     // Same orthographic projection
     glm::mat4 ortho = glm::ortho( 0.0f, (float)windowWidth, (float)windowHeight, 0.0f );
 
@@ -103,8 +102,7 @@ void TextRenderer::DrawScreenText( const std::string &text, float x, float y, in
 
     glUseProgram( textProgram );
     glUniformMatrix4fv( uniOrtho, 1, GL_FALSE, glm::value_ptr( ortho ) );
-    glUniform3f( uniColor, 1.0f, 1.0f, 1.0f );
-
+    glUniform4f( uniColor, 1, 1, 1, alpha );
     glBindVertexArray( textVAO );
     for (int i = 0; i < quads; ++i)
         glDrawArrays( GL_TRIANGLE_FAN, i * 4, 4 );

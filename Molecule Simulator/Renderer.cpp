@@ -124,8 +124,8 @@ void Renderer::DrawGrid( int w, int h ) {
 }
 
 void Renderer::DrawAtom( const Atom &a, int w, int h, bool highlight ) {
-    glm::mat4 proj = glm::perspective( glm::radians( 45.0f ),
-        (float)w / (float)h, 0.1f, 100.0f );
+    glm::mat4 proj = glm::perspective( glm::radians( 45.f ),
+        (float)w / h, 0.1f, 100.f );
     glm::mat4 model = glm::translate( glm::mat4( 1 ), a.position ) *
         glm::scale( glm::mat4( 1 ), glm::vec3( a.radius ) );
 
@@ -134,38 +134,34 @@ void Renderer::DrawAtom( const Atom &a, int w, int h, bool highlight ) {
     sphereShader->setMat4( "projection", proj );
     sphereShader->setMat4( "model", model );
     sphereShader->setVec3( "color", a.color );
-    sphereShader->setVec3( "lightPos", glm::vec3( 5.0f, 5.0f, 5.0f ) );
+    sphereShader->setVec3( "lightPos", { 5,5,5 } );
     sphereShader->setVec3( "viewPos", cameraPtr->Position );
-    sphereShader->setFloat( "emissiveBoost", highlight ? 1.0f : 0.0f );
+    sphereShader->setFloat( "emissiveBoost", highlight ? 1.f : 0.f );
 
     sphereMesh.Draw();
 }
 
-
-
-void Renderer::DrawBondCylinder( const glm::vec3 &A,
-    const glm::vec3 &B,
-    float radius,
-    int w, int h,
+void Renderer::DrawBondCylinder( const glm::vec3 &A, const glm::vec3 &B,
+    float radius, int w, int h,
     const glm::vec3 &color ) {
     glm::vec3 dir = B - A;
     float len = glm::length( dir );
-    glm::vec3 mid = 0.5f * (A + B);
-    glm::quat rot = RotationBetween( glm::vec3( 0, 1, 0 ), dir );
+    glm::vec3 mid = .5f * (A + B);
+    glm::quat rot = RotationBetween( { 0,1,0 }, dir );
 
-    glm::mat4 model = glm::translate( glm::mat4( 1 ), mid )
-        * glm::mat4_cast( rot )
-        * glm::scale( glm::mat4( 1 ), glm::vec3( radius, len * 0.5f, radius ) );
-    glm::mat4 proj = glm::perspective( glm::radians( 45.0f ),
-        (float)w / (float)h, 0.1f, 100.0f );
+    glm::mat4 model = glm::translate( glm::mat4( 1 ), mid ) *
+        glm::mat4_cast( rot ) *
+        glm::scale( glm::mat4( 1 ), { radius, len * 0.5f, radius } );
+    glm::mat4 proj = glm::perspective( glm::radians( 45.f ), (float)w / h, 0.1f, 100.f );
 
     cylinderShader->use();
     cylinderShader->setMat4( "view", cameraPtr->GetViewMatrix() );
     cylinderShader->setMat4( "projection", proj );
     cylinderShader->setMat4( "model", model );
-    cylinderShader->setVec3( "color", color );   
+    cylinderShader->setVec3( "color", color );
     cylinderMesh.Draw();
 }
+
 
 void Renderer::DrawArrow( const glm::vec3 &start,
     const glm::vec3 &end,

@@ -76,3 +76,13 @@ void Bond::render( int w, int h ) const {
     }
 }
 
+bool Bond::contains( const glm::vec3 &O, const glm::vec3 &D ) const {
+    glm::vec3 A = atomA->position, B = atomB->position;
+    glm::vec3 AB = B - A, AO = O - A;
+    float t = glm::dot( AB, AO ) / glm::dot( AB, AB );
+    t = glm::clamp( t, 0.f, 1.f );
+    glm::vec3 P = A + t * AB;
+    float dist = glm::length( glm::cross( D, P - O ) );
+    return dist < 0.08f;   // cylinder radius + tolerance
+}
+
