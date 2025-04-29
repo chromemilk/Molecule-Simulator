@@ -1,6 +1,6 @@
 # 3D Molecule Simulator
 
-A real-time 3D simulation written in modern C++ using OpenGL.
+A real-time 3D simulation written in modern C++ using OpenGL - 2530 lines so far
 
 ## Example
 
@@ -25,11 +25,19 @@ https://github.com/user-attachments/assets/a79641f6-50ad-49c7-9c50-a4042feb9597
 - Molecule simulations are build on a custom particle engine
 - Extended periodic table for enhanced lookups
 - Loads shaders and creates meshes for full 3D enhancements
-- Grid
+- Floor grid
 - Uses a flying camera for 360 view of any structure
 - Model interations using Valence Electron Shell Repulsion Theory (dynamically computes lone pair positions using VSEPR theory)
 - Easy to use molecule builder (new)
 - Formal charge calculations (new)
+- Real-Time creation, and deletion of bonds (new)
+- Real-Time dragging of molecules (new)
+- Molecules update in real time to client interations (new)
+- Dynamic light shaders (no raytracing) (new)
+- Advanced molecule stability system (new)
+- Relevant atom information on-hover (new)
+- Collision detection for molecule and camera (new)
+- Even more advanced lone-pair position calculations (new)
 
 ## 📚 Tech Stack
 - **C++17**
@@ -52,9 +60,10 @@ Make sure you have installed:
 ## 🛠️ Planned Features
 - Chemical equation parsing
 - Automatic resonance structure computation
-- Correction stability system (currently structures fly around until ideal angles are reached)
 - Dynamic light shaders with raytracing
 - GUI
+- Expanded octect rules (add nuance into calculations)
+- Attempt to find imperical angles along with model/simulation angles 
 
 ## 🎨 Future Ideas
 - Add a GUI (ImGui) for real-time tweaking
