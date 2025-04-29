@@ -22,117 +22,83 @@ AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
 }
 
 void AtomSystem::update( float dt ) {
-    for (auto &bond : bonds)
-        bond.applyForce();
-
+    for (Bond &b : bonds)           b.applyForce();
     applyVSEPRForces( dt );
 
-    for (auto &atom : atoms)
-        atom.update( dt );
+    for (Atom &a : atoms)           a.update( dt );
 
-    updatePolarities();       
+    updatePolarities();
 
+    computeLonePairDots();         
 }
 
 
 void AtomSystem::render( int w, int h ) {
-    // determine first?central geometry once
+    // one-time central geometry ------------------------------------------------
     if (firstCentralGeometry.empty())
-    {
-        for (auto &a : atoms)
-            if (a.bondedAtoms.size() >= 2 || a.lonePairs > 0)
+        for (Atom &a : atoms)
+            if (a.bondedAtoms.size() >= 2 || a.lonePairs)
             {
-                firstCentralGeometry = determineGeometry( a );
-                break;
+                firstCentralGeometry = determineGeometry( a ); break;
             }
-    }
 
-    // draw bonds
-    for (auto &b : bonds)
-    {
-        b.render( w, h );
-    }
+    // bonds --------------------------------------------------------------------
+    for (Bond &b : bonds)   b.render( w, h );
 
-    for (auto &a : atoms)
-    {
-        bool isSel = (&a == selectedAtom) || (&a == hoveredAtom);
-        Renderer::DrawAtom( a, w, h, isSel );
-    }
+    // atoms --------------------------------------------------------------------
+    for (Atom &a : atoms)
+        Renderer::DrawAtom( a, w, h, (&a == selectedAtom) || (&a == hoveredAtom) );
 
-    if (hoveredAtom)
-    {
-        const Element &e = PeriodicTable::Instance().Get( hoveredAtom->type );
-        int s = 0, d = 0, t = 0;
-        for (auto &b : bonds)
-            if (b.atomA == hoveredAtom || b.atomB == hoveredAtom)
-            {
-                if (b.type == BondType::SINGLE) ++s;
-                if (b.type == BondType::DOUBLE) ++d;
-                if (b.type == BondType::TRIPLE) ++t;
-            }
-        float mu = glm::length( hoveredAtom->polarityDir );
+    // lone-pair dots -----------------------------------------------------------
+    glEnable( GL_BLEND );
+    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+    glDepthMask( GL_FALSE );
 
-        std::ostringstream oss;
-        oss << e.symbol << " (" << e.atomicNumber << ") " << e.atomicMass << " u\n"
-            << "EN: " << e.electronegativity << "\n"
-            << "Dipole: " << mu << "\n"
-            << "LonePairs: " << hoveredAtom->lonePairs << "\n"
-            << "Bonds: " << hoveredAtom->bondedAtoms.size() << "\n";
-        if (s) oss << " - Single: " << s << "\n";
-        if (d) oss << " - Double: " << d << "\n";
-        if (t) oss << " - Triple: " << t << "\n";
+    for (Atom &dot : lonePairDots)
+        Renderer::DrawAtom( dot, w, h, &dot == hoveredAtom );
 
-        float sx = 10, sy = 260, dy = 20; int line = 0;
-        std::istringstream iss( oss.str() );
-        std::string ln;
-        while (std::getline( iss, ln ))
-        {
-            textRenderer.DrawScreenText( ln, sx, sy + line * dy, w, h );
-            ++line;
-        }
-    }
-
-    for (auto &a : atoms)
-    {
-        std::string lbl = a.type + StringUtils::chargeString( a.formalCharge );
-        textRenderer.DrawText( lbl, a.position, w, h );
-    }
-    if (!firstCentralGeometry.empty())
-    {
-        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry, 10, 90, w, h );
-    }
-
-    std::unordered_map<Atom *, std::vector<glm::vec3>> lpmap;
-    computeLonePairPositions( lpmap );
-    for (auto &kv : lpmap)
-        for (auto &pos : kv.second)
-        {
-            Atom dot( "LP", pos, 0.1f );
-            dot.radius = 0.08f; dot.color = glm::vec3( 0.7f, 0.7f, 1.f );
-            glEnable( GL_BLEND );
-            glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-            glDepthMask( GL_FALSE );
-            Renderer::DrawAtom( dot, w, h );
-        }
     glDisable( GL_BLEND );
     glDepthMask( GL_TRUE );
 
-    for (auto &a : atoms)
+    // small labels on every atom ----------------------------------------------
+    for (Atom &a : atoms)
+        textRenderer.DrawText( a.type + StringUtils::chargeString( a.formalCharge ),
+            a.position, w, h );
+
+    // bond-angle read-outs -----------------------------------------------------
+    renderBondAngles( w, h );
+
+    // HUD – geometry + tooltip -------------------------------------------------
+    if (!firstCentralGeometry.empty())
+        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry, 10, 90, w, h );
+
+    if (hoveredAtom) drawTooltip( *hoveredAtom, w, h );
+
+    // tiny dipole arrows -------------------------------------------------------
+    for (Atom &a : atoms)
     {
-        glm::vec3 st = a.position + glm::vec3( 0, a.radius + 0.1f, 0 );
-        glm::vec3 en = st + a.polarityDir * 0.5f;
-        Renderer::DrawArrow( st, en, glm::vec3( 1, 0, 0 ), w, h );
+        glm::vec3 s = a.position + glm::vec3( 0, a.radius + .1f, 0 );
+        Renderer::DrawArrow( s, s + a.polarityDir * .5f,
+            glm::vec3( 1, 0, 0 ), w, h );
     }
 }
 
+const std::vector<Atom> &AtomSystem::getLonePairs() const {
+    return lonePairDots;
+}
+std::vector<Bond> &AtomSystem::getBonds() {
+    return bonds;
+}
+
+void AtomSystem::setDirtyLonePairs() {
+    lonePairsDirty = true;
+}
 
 
-void AtomSystem::spawnAtom( const std::string &type ) {
-    if (atoms.size() < maxAtoms)
-    {
-        glm::vec3 pos = MathUtils::GetRandomVector3( -2.0f, 2.0f );
-        atoms.emplace_back( type, pos, 1.0f );
-    }
+void AtomSystem::spawnAtom( const std::string &sym ) {
+    if (atoms.size() >= maxAtoms) return;
+    atoms.emplace_back( sym, MathUtils::GetRandomVector3( -2, 2 ), 1.f );
+    setDirtyLonePairs();
 }
 
 void AtomSystem::addAtom( const Atom &atom ) {
@@ -140,17 +106,17 @@ void AtomSystem::addAtom( const Atom &atom ) {
         atoms.push_back( atom );
 }
 
-void AtomSystem::createBond( int indexA, int indexB, BondType bondType ) {
-    if (indexA >= 0 && indexB >= 0 && indexA < atoms.size() && indexB < atoms.size())
+void AtomSystem::createBond( int ia, int ib, BondType t ) {
+    if (ia < 0 || ib < 0 || ia >= atoms.size() || ib >= atoms.size())
     {
-        bonds.emplace_back( &atoms[ indexA ], &atoms[ indexB ], bondType );
-        atoms[ indexA ].bondedAtoms.push_back( &atoms[ indexB ] );
-        atoms[ indexB ].bondedAtoms.push_back( &atoms[ indexA ] );
+        std::cerr << "bad bond\n"; return;
     }
-    else
-    {
-        std::cerr << "Invalid bond indices!" << std::endl;
-    }
+
+    bonds.emplace_back( &atoms[ ia ], &atoms[ ib ], t );
+    atoms[ ia ].bondedAtoms.push_back( &atoms[ ib ] );
+    atoms[ ib ].bondedAtoms.push_back( &atoms[ ia ] );
+
+    setDirtyLonePairs();        // geometry changed ? rebuild LPs next frame
 }
 
 void AtomSystem::applyVSEPRForces( float dt ) {
@@ -215,23 +181,31 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
     }
 }
 
-// TODO: expanded octet
+// TODO: expanded octets, trigonal bipyramidal, octahedral
 void AtomSystem::updateLonePairs() {
     auto &pt = PeriodicTable::Instance();
+    bool anyChange = false;
 
     for (Atom &a : atoms)
     {
         int bondedElectrons = 0;
-        for (Bond &b : bonds)
+        for (const Bond &b : bonds)
             if (b.atomA == &a || b.atomB == &a)
-                bondedElectrons += 2 * b.bondOrder();           
+                bondedElectrons += 2 * b.bondOrder();
 
-        int desired = (a.type == "H") ? 2 : 8;
+        const int desired = (a.type == "H") ? 2 : 8;
+        int newLP = std::max( 0, desired - bondedElectrons ) / 2;
 
-        int remaining = std::max( 0, desired - bondedElectrons );
-        a.lonePairs = remaining / 2;
+        if (newLP != a.lonePairs)
+        {
+            a.lonePairs = newLP;
+            anyChange = true;        // <- at least one atom changed
+        }
     }
+
+    if (anyChange) setDirtyLonePairs(); // <- **tell the dot builder**
 }
+
 
 float AtomSystem::computeDipole() {
     netDipole = glm::vec3( 0.0f );
@@ -475,4 +449,112 @@ void AtomSystem::updatePolarities() {
             a.polarityDir = glm::vec3( 0, 1, 0 );
         }
     }
+}
+
+void AtomSystem::computeLonePairDots() {
+   // if (!lonePairsDirty) return;
+  //  lonePairsDirty = false;
+
+    lonePairDots.clear();
+
+    static const glm::vec3 tetra[ 4 ] =
+    {
+        glm::normalize( glm::vec3( 1, 1, 1 ) ),
+        glm::normalize( glm::vec3( -1,-1, 1 ) ),
+        glm::normalize( glm::vec3( 1,-1,-1 ) ),
+        glm::normalize( glm::vec3( -1, 1,-1 ) )
+    };
+
+    for (Atom &a : atoms)
+    {
+        if (a.lonePairs == 0) continue;
+
+        //------------------------------------------------------------
+        // choose directions for LP-domains
+        //------------------------------------------------------------
+        std::vector<glm::vec3> dirs;
+
+        int groups = (int)a.bondedAtoms.size() + a.lonePairs;
+        if (groups <= 3)                             // planar / linear
+        {
+            for (int i = 0; i < a.lonePairs; ++i)
+            {
+                float ang = i * glm::two_pi<float>() / a.lonePairs;
+                dirs.emplace_back( cosf( ang ), sinf( ang ), 0 );
+            }
+        }
+        else                                       // tetrahedral slots
+        {
+            bool used[ 4 ] = { false,false,false,false };
+            for (Atom *nb : a.bondedAtoms)
+            {
+                glm::vec3 v = glm::normalize( nb->position - a.position );
+                float best = -2; int idx = -1;
+                for (int j = 0; j < 4; ++j)
+                {
+                    float d = glm::dot( v, tetra[ j ] );
+                    if (d > best)
+                    {
+                        best = d; idx = j;
+                    }
+                }
+                used[ idx ] = true;
+            }
+            for (int j = 0; j < 4 && dirs.size() < a.lonePairs; ++j)
+                if (!used[ j ]) dirs.push_back( tetra[ j ] );
+        }
+
+        //------------------------------------------------------------
+        // emit two small spheres for each lone-pair
+        //------------------------------------------------------------
+        const float baseR = a.radius;          // on surface
+        const float spread = a.radius * 0.9f;     // pair separation
+
+        for (glm::vec3 d : dirs)
+        {
+            d = glm::normalize( d );
+            glm::vec3 ref = fabs( d.y ) < .99f ? glm::vec3( 0, 1, 0 ) : glm::vec3( 1, 0, 0 );
+            glm::vec3 perp = glm::normalize( glm::cross( d, ref ) );
+
+            glm::vec3 centre = a.position + d * baseR;
+
+            for (int sgn : { +1, -1 })
+            {
+                const glm::vec3 pos = centre + perp * (spread * static_cast<float>(sgn));
+                Atom dot( "LP", pos, 0.1f );
+                dot.radius = 0.08f;
+                dot.color = glm::vec3( 0.7f, 0.7f, 1.0f );
+                lonePairDots.push_back( dot );
+            }
+
+        }
+    }
+}
+
+void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
+    const Element &e = PeriodicTable::Instance().Get( at.type );
+
+    int ns = 0, nd = 0, nt = 0;
+    for (const Bond &b : bonds)
+        if (b.atomA == &at || b.atomB == &at)
+        {
+            if (b.type == BondType::SINGLE)  ++ns;
+            if (b.type == BondType::DOUBLE)  ++nd;
+            if (b.type == BondType::TRIPLE)  ++nt;
+        }
+
+    std::ostringstream os;
+    os << e.symbol << " (" << e.atomicNumber << ")  " << e.atomicMass << " u\n"
+        << "EN " << e.electronegativity << "\n"
+        << "Dipole " << glm::length( at.polarityDir ) << "\n"
+        << "LP " << at.lonePairs << "\n"
+        << "Bonds " << at.bondedAtoms.size() << "\n";
+    if (ns) os << "  single " << ns << "\n";
+    if (nd) os << "  double " << nd << "\n";
+    if (nt) os << "  triple " << nt << "\n";
+
+    float x = 10, y = 260, dy = 20;  int i = 0;  std::string ln;
+    std::istringstream iss( os.str() );
+    while (std::getline( iss, ln ))
+        textRenderer.DrawScreenText( ln, x, y + i * dy, w, h ), ++i;
 }

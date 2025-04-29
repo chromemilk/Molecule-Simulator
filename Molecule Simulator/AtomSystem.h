@@ -17,6 +17,10 @@ public:
     void update( float dt );
     void render( int w, int h );
 
+    std::vector<Bond> &getBonds();
+
+    void setDirtyLonePairs();
+
     void spawnAtom( const std::string &type );
     void addAtom( const Atom &atom );
     void createBond( int ia, int ib, BondType t = BondType::SINGLE );
@@ -26,6 +30,10 @@ public:
     float computeDipole();
 
     void updatePolarities();
+
+    void computeLonePairDots();
+
+    void drawTooltip( const Atom &at, int w, int h ) const;
 
     void build( const std::vector<std::string> &symbols,
         const std::vector<std::tuple<int, int, int>> &bonds );
@@ -38,17 +46,16 @@ public:
     int      sigmaBonds = 0;
     int      piBonds = 0;
 
-    const std::vector<Atom> &getAtoms()     const {
+    const std::vector<Atom> &getAtoms() const {
         return atoms;
     }
-    const std::vector<Atom> &getLonePairs() const {
-        return lonePairAtoms;
-    }
-    const std::vector<Bond> &getBonds()     const {
-        return bonds;
-    }
+    const std::vector<Atom> &getLonePairs() const;
+ 
 
     std::vector<Bond>          bonds;
+
+    std::vector<Atom> lonePairDots;
+    bool lonePairsDirty = true;
 
 
 private:
