@@ -34,6 +34,10 @@ Atom *hoveredAtom = nullptr;
 Atom *bondFirst = nullptr;   // remember first click
 int   nextOrder = 1;         // 1=single default
 
+float  grabPlaneY = 0.0f;        // y-level at which we grabbed the atom
+glm::vec3 grabRayDir;              // ray direction when grab started
+
+
 glm::vec3 screenRay( int mx, int my ) {
     float ndcX = 2.f * mx / WIN_W - 1.f;
     float ndcY = -2.f * my / WIN_H + 1.f;
@@ -102,79 +106,98 @@ void framebuffer_size_callback(GLFWwindow*, int w, int h) {
 void mouse_callback( GLFWwindow *, double xpos, double ypos ) {
     if (firstMouse)
     {
-        lastX = xpos; lastY = ypos; firstMouse = false;
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
     }
-    float xoff = xpos - lastX,
-        yoff = lastY - ypos;
-    lastX = xpos; lastY = ypos;
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
 
     if (currentMode == ControlMode::FLY_CAMERA)
-        camera.ProcessMouseMovement( xoff, yoff );
+    {
+        camera.ProcessMouseMovement( xoffset, yoffset );
+    }
     else if (dragging && selectedAtom)
     {
         float depth = glm::length( selectedAtom->position - camera.Position );
-        glm::mat4 P = glm::perspective( glm::radians( camera.Zoom ),
+
+        glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ),
             float( WIN_W ) / WIN_H, 0.1f, 100.f );
-        glm::mat4 V = camera.GetViewMatrix(),
-            VP = P * V, invVP = glm::inverse( VP );
-        float ndcX = 2.f * xpos / WIN_W - 1.f,
-            ndcY = 1.f - 2.f * ypos / WIN_H;
-        glm::vec4 ndc( ndcX, ndcY, 1, 1 ),
-            world = invVP * ndc;
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 invVP = glm::inverse( proj * view );
+
+        float ndcX = 2.f * xpos / WIN_W - 1.f;
+        float ndcY = 1.f - 2.f * ypos / WIN_H;
+        glm::vec4 ndc( ndcX, ndcY, 1.f, 1.f );
+        glm::vec4 world = invVP * ndc;
         world /= world.w;
+
         glm::vec3 newDir = glm::normalize( glm::vec3( world ) - camera.Position );
+
         selectedAtom->position = camera.Position + newDir * depth;
-        selectedAtom->velocity = glm::vec3( 0.f );
+        selectedAtom->velocity = glm::vec3( 0.f );   // Zero momentum when dragging
+
+        constexpr float FLOOR_Y = -0.2f;
+        if (selectedAtom->position.y - selectedAtom->radius < FLOOR_Y)
+        {
+            selectedAtom->position.y = FLOOR_Y + selectedAtom->radius;
+        }
     }
-    // update hover only when not dragging
+
     if (currentMode == ControlMode::PICK_DRAG && !dragging)
     {
-        double mx, my; glfwGetCursorPos( window, &mx, &my );
+        double mx, my;
+        glfwGetCursorPos( window, &mx, &my );
+
         hoveredAtom = PickAtom( (int)mx, (int)my,
             WIN_W, WIN_H,
             atoms.getAtoms(),
-            {} );  
+            {} );  // Only pick real atoms for tooltip
     }
 }
 
 
 void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
-    double mx, my; glfwGetCursorPos( window, &mx, &my );
+    double mx, my;
+    glfwGetCursorPos( window, &mx, &my );
+
 
     if (button == GLFW_MOUSE_BUTTON_LEFT &&
         action == GLFW_PRESS &&
         currentMode == ControlMode::PICK_DRAG)
     {
-        Atom *hit = PickAtom( (int)mx, (int)my,
+        Atom *hit = PickAtom( static_cast<int>(mx), static_cast<int>(my),
             WIN_W, WIN_H,
-            atoms.getAtoms(),
-            atoms.getLonePairs() );
+            atoms.getAtoms(), atoms.getLonePairs() );
         if (!hit) return;
 
-        // find index in real?atoms
-        int idx = std::find_if( atoms.getAtoms().begin(),
-            atoms.getAtoms().end(),
-            [&]( const Atom &a ) {return &a == hit; } )
+        // Is the hit an actual atom or a lone-pair dot?
+        int idx = std::find_if( atoms.getAtoms().begin(), atoms.getAtoms().end(),
+            [&]( const Atom &a ) { return &a == hit; } )
             - atoms.getAtoms().begin();
-        if (idx >= (int)atoms.getAtoms().size())
-        {
-            // it's an LP-dot
+
+        if (idx >= static_cast<int>(atoms.getAtoms().size()))
+        {   // Lone-pair: just start drag
             selectedAtom = hit;
             dragging = true;
+
+            grabPlaneY = selectedAtom->position.y;
+            grabRayDir = screenRay( static_cast<int>(mx), static_cast<int>(my) );
             return;
         }
 
-        // bond creation
         if (bondFirst && bondFirst != hit)
         {
-            int idx0 = std::find_if( atoms.getAtoms().begin(),
-                atoms.getAtoms().end(),
-                [&]( const Atom &a ) {return &a == bondFirst; } )
+            int idx0 = std::find_if( atoms.getAtoms().begin(), atoms.getAtoms().end(),
+                [&]( const Atom &a ) { return &a == bondFirst; } )
                 - atoms.getAtoms().begin();
-            if (idx0 < (int)atoms.getAtoms().size())
+            if (idx0 < static_cast<int>( atoms.getAtoms().size() ))
             {
-                BondType t = nextOrder == 1 ? BondType::SINGLE :
-                    nextOrder == 2 ? BondType::DOUBLE :
+                BondType t = (nextOrder == 1) ? BondType::SINGLE :
+                    (nextOrder == 2) ? BondType::DOUBLE :
                     BondType::TRIPLE;
                 atoms.createBond( idx0, idx, t );
             }
@@ -182,40 +205,48 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         }
         else
         {
-            bondFirst = hit;
+            bondFirst = hit;          // first atom of a future bond
         }
+
         selectedAtom = hit;
         dragging = true;
+
+        grabPlaneY = selectedAtom->position.y;
+        grabRayDir = screenRay( static_cast<int>(mx), static_cast<int>(my) );
     }
+
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
     {
-        dragging = false; selectedAtom = nullptr;
+        dragging = false;
+        selectedAtom = nullptr;
     }
 
-    // right-click deletes bond
     if (button == GLFW_MOUSE_BUTTON_RIGHT &&
         action == GLFW_PRESS &&
         currentMode == ControlMode::PICK_DRAG)
     {
-        glm::vec3 O = camera.Position, D = screenRay( mx, my );
+        glm::vec3 O = camera.Position;
+        glm::vec3 D = screenRay( static_cast<int>(mx), static_cast<int>(my) );
+
         auto &B = atoms.getBonds();
-        for (int i = 0; i < (int)B.size(); ++i)
+        for (int i = 0; i < static_cast<int>( B.size() ); ++i)
+        {
             if (B[ i ].contains( O, D ))
             {
-                // remove from each atom’s bondedAtoms
-                auto erasePtr = [&]( Atom *tgt, Atom *oth ) {
+                // remove bond from both atoms’ lists
+                auto erasePtr = []( Atom *tgt, Atom *oth ) {
                     auto &v = tgt->bondedAtoms;
                     v.erase( std::remove( v.begin(), v.end(), oth ), v.end() );
                     };
                 erasePtr( B[ i ].atomA, B[ i ].atomB );
                 erasePtr( B[ i ].atomB, B[ i ].atomA );
-                atoms.bonds.erase( atoms.getBonds().begin() + i );
+                atoms.bonds.erase( atoms.bonds.begin() + i );
                 break;
             }
+        }
     }
 }
-
 
 
 void scroll_callback(GLFWwindow*, double, double yoff) {
@@ -367,7 +398,7 @@ int main() {
     textRenderer.Init();
 
 
-    buildO3( atoms );
+    buildH2O( atoms );
 
     while (!glfwWindowShouldClose( window ))
     {

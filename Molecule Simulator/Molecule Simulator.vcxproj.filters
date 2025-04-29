@@ -143,6 +143,9 @@
     <ClInclude Include="StringUtils.h">
       <Filter>Source Files\strings</Filter>
     </ClInclude>
+    <ClInclude Include="Geometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_vertex.glsl">

@@ -1,5 +1,8 @@
 #include "Camera.h"
 
+constexpr float FLOOR_Y = -0.2f;  // Same as grid plane Y level
+constexpr float CAMERA_CLEARANCE = 0.3f; // How high the camera must stay above floor
+
 Camera::Camera( glm::vec3 position )
     : Front( glm::vec3( 0.0f, 0.0f, -1.0f ) ),
     MovementSpeed( 5.0f ),
@@ -26,6 +29,9 @@ void Camera::ProcessKeyboard( Camera_Movement direction, float deltaTime ) {
         Position -= Right * velocity;
     if (direction == Camera_Movement::RIGHT)
         Position += Right * velocity;
+
+    if (Position.y < FLOOR_Y + CAMERA_CLEARANCE)
+        Position.y = FLOOR_Y + CAMERA_CLEARANCE;
 }
 
 void Camera::ProcessMouseMovement( float xoffset, float yoffset ) {
@@ -35,6 +41,7 @@ void Camera::ProcessMouseMovement( float xoffset, float yoffset ) {
     Yaw += xoffset;
     Pitch += yoffset;
 
+    // Clamp pitch angle to avoid flipping
     if (Pitch > 89.0f)
         Pitch = 89.0f;
     if (Pitch < -89.0f)

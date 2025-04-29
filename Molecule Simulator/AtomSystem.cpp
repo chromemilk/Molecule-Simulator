@@ -539,7 +539,7 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     if (nd) os << "  double " << nd << "\n";
     if (nt) os << "  triple " << nt << "\n";
 
-    float x = 10, y = 260, dy = 20;  int i = 0;  std::string ln;
+    float x = 10, y = 280, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );
     while (std::getline( iss, ln ))
         textRenderer.DrawScreenText( ln, x, y + i * dy, w, h ), ++i;
