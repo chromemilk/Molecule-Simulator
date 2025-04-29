@@ -38,6 +38,9 @@ https://github.com/user-attachments/assets/a79641f6-50ad-49c7-9c50-a4042feb9597
 - Relevant atom information on-hover (new)
 - Collision detection for molecule and camera (new)
 - Even more advanced lone-pair position calculations (new)
+- Polarity calculation using partial charges
+- Displays pi and sigma bonds
+- Gives a simulation stability indicator
 
 ## 📚 Tech Stack
 - **C++17**
