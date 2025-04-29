@@ -410,6 +410,8 @@ int main() {
             10, 210, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
             10, 230, w, h );
+        textRenderer.DrawScreenText( "Right Click = -bond, click atom then 1,2,3 and other atom",
+            10, 250, w, h );
 
 
         glfwSwapBuffers( window );

@@ -34,7 +34,6 @@ void AtomSystem::update( float dt ) {
 
 
 void AtomSystem::render( int w, int h ) {
-    // one-time central geometry ------------------------------------------------
     if (firstCentralGeometry.empty())
         for (Atom &a : atoms)
             if (a.bondedAtoms.size() >= 2 || a.lonePairs)
@@ -42,14 +41,11 @@ void AtomSystem::render( int w, int h ) {
                 firstCentralGeometry = determineGeometry( a ); break;
             }
 
-    // bonds --------------------------------------------------------------------
     for (Bond &b : bonds)   b.render( w, h );
 
-    // atoms --------------------------------------------------------------------
     for (Atom &a : atoms)
         Renderer::DrawAtom( a, w, h, (&a == selectedAtom) || (&a == hoveredAtom) );
 
-    // lone-pair dots -----------------------------------------------------------
     glEnable( GL_BLEND );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glDepthMask( GL_FALSE );
@@ -60,21 +56,17 @@ void AtomSystem::render( int w, int h ) {
     glDisable( GL_BLEND );
     glDepthMask( GL_TRUE );
 
-    // small labels on every atom ----------------------------------------------
     for (Atom &a : atoms)
         textRenderer.DrawText( a.type + StringUtils::chargeString( a.formalCharge ),
             a.position, w, h );
 
-    // bond-angle read-outs -----------------------------------------------------
     renderBondAngles( w, h );
 
-    // HUD – geometry + tooltip -------------------------------------------------
     if (!firstCentralGeometry.empty())
         textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry, 10, 90, w, h );
 
     if (hoveredAtom) drawTooltip( *hoveredAtom, w, h );
 
-    // tiny dipole arrows -------------------------------------------------------
     for (Atom &a : atoms)
     {
         glm::vec3 s = a.position + glm::vec3( 0, a.radius + .1f, 0 );
@@ -116,7 +108,7 @@ void AtomSystem::createBond( int ia, int ib, BondType t ) {
     atoms[ ia ].bondedAtoms.push_back( &atoms[ ib ] );
     atoms[ ib ].bondedAtoms.push_back( &atoms[ ia ] );
 
-    setDirtyLonePairs();        // geometry changed ? rebuild LPs next frame
+    setDirtyLonePairs();        
 }
 
 void AtomSystem::applyVSEPRForces( float dt ) {
@@ -199,11 +191,11 @@ void AtomSystem::updateLonePairs() {
         if (newLP != a.lonePairs)
         {
             a.lonePairs = newLP;
-            anyChange = true;        // <- at least one atom changed
+            anyChange = true;        
         }
     }
 
-    if (anyChange) setDirtyLonePairs(); // <- **tell the dot builder**
+    if (anyChange) setDirtyLonePairs(); 
 }
 
 
@@ -350,7 +342,6 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
 void AtomSystem::updateFormalCharges() {
     for (Atom &atom : atoms)
     {
-        /* count electron PAIRS in bonds to this atom */
         int bondPairs = 0;
         for (Bond &b : bonds)
             if (b.atomA == &atom || b.atomB == &atom)
@@ -469,9 +460,6 @@ void AtomSystem::computeLonePairDots() {
     {
         if (a.lonePairs == 0) continue;
 
-        //------------------------------------------------------------
-        // choose directions for LP-domains
-        //------------------------------------------------------------
         std::vector<glm::vec3> dirs;
 
         int groups = (int)a.bondedAtoms.size() + a.lonePairs;
@@ -504,9 +492,7 @@ void AtomSystem::computeLonePairDots() {
                 if (!used[ j ]) dirs.push_back( tetra[ j ] );
         }
 
-        //------------------------------------------------------------
-        // emit two small spheres for each lone-pair
-        //------------------------------------------------------------
+
         const float baseR = a.radius;          // on surface
         const float spread = a.radius * 0.9f;     // pair separation
 
