@@ -226,6 +226,13 @@ float AtomSystem::computeDipole() {
     return dipoleMag;
 }
 
+void AtomSystem::spawnAtom( const std::string & sym, const glm::vec3 & pos )   // NEW
+ {
+    if (atoms.size() >= maxAtoms) return;
+    atoms.emplace_back( sym, pos, 1.f );
+    setDirtyLonePairs();
+  }
+
 
 void AtomSystem::computeLonePairPositions(
     std::unordered_map<Atom *, std::vector<glm::vec3>> &out ) {
@@ -545,7 +552,7 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     if (nd) os << "  Double: " << nd << "\n";
     if (nt) os << "  Triple: " << nt << "\n";
 
-    float x = 10, y = 280, dy = 20;  int i = 0;  std::string ln;
+    float x = 10, y = 390, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );
     while (std::getline( iss, ln ))
         textRenderer.DrawScreenText( ln, x, y + i * dy, w, h ), ++i;

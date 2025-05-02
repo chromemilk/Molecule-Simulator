@@ -1,14 +1,13 @@
 #include "Particle.h"
 
 const glm::vec3 gravity = glm::vec3( 0.0f, -9.8f, 0.0f );
-const float boxSize = 5.0f; // walls at x/y/z = ±5
+const float boxSize = 5.0f;
 
 void Particle::update( float dt ) {
     velocity += gravity * dt;
     position += velocity * dt;
     life -= dt;
 
-    // Wall collision: simple axis-aligned bounding box
     if (position.x < -boxSize)
     {
         position.x = -boxSize;

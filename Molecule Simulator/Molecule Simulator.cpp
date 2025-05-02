@@ -7,6 +7,7 @@
 #include "Renderer.h"
 #include "TextRenderer.h"
 #include "AtomSystem.h"
+#include "tinyfiledialogs.h" 
 
 #include <iostream>
 
@@ -39,6 +40,12 @@ Atom *breakFirst = nullptr;
 
 float  grabPlaneY = 0.0f;        // y-level at which we grabbed the atom
 glm::vec3 grabRayDir;              // ray direction when grab started
+
+bool        wantSpawnPopup = false;          
+static char symbolBuf[ 8 ] = "";          
+
+std::string buildSymbol;              // already existed
+bool        deleteMode = false;     // keep – toggled with a key now
 
 
 glm::vec3 screenRay( int mx, int my ) {
@@ -175,15 +182,27 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         Atom *hit = PickAtom( static_cast<int>(mx), static_cast<int>(my),
             WIN_W, WIN_H,
             atoms.getAtoms(), atoms.getLonePairs() );
+
         if (!hit)
-        {              
+        {
+            if (!buildSymbol.empty())                         
+            {
+                glm::vec3 dir = screenRay( (int)mx, (int)my );
+                float t = (0.0f - camera.Position.y) / dir.y; // plane-intersection
+                glm::vec3 pos = camera.Position + dir * t;
+
+                atoms.spawnAtom( buildSymbol, pos );
+
+                buildSymbol.clear();
+
+                return;                                      
+            }
+
             bondFirst = nullptr;
             dragging = false;
             selectedAtom = nullptr;
             return;
         }
-
-        if (!hit) return;
 
         // Is the hit an actual atom or a lone-pair dot?
         int idx = std::find_if( atoms.getAtoms().begin(), atoms.getAtoms().end(),
@@ -291,53 +310,72 @@ void processInput( GLFWwindow *w ) {
     if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
         glfwSetWindowShouldClose( w, true );
 
-    // WASD only in fly mode
+    static bool lastI = false;
+    bool nowI = glfwGetKey( w, GLFW_KEY_I ) == GLFW_PRESS;
+    if (nowI && !lastI)                                            // edge
+    {
+        const char *inp = tinyfd_inputBox(
+            "Insert element / ion",
+            "Enter atomic symbol or ion (e.g. H, Cl-, Mg2+):", "" );
+        if (inp && *inp)                                           // OK + non-empty
+        {
+            buildSymbol = inp;         // switch to spawn mode
+            deleteMode = false;       // leave eraser if it was on
+        }
+    }
+    lastI = nowI;
+
+    static bool lastX = false;
+    bool nowX = glfwGetKey( w, GLFW_KEY_X ) == GLFW_PRESS;
+    if (currentMode == ControlMode::PICK_DRAG && nowX && !lastX)   
+    {
+        deleteMode = !deleteMode;
+        if (deleteMode) buildSymbol.clear();   // cannot spawn while erasing
+    }
+    lastX = nowX;
+
     if (currentMode == ControlMode::FLY_CAMERA)
     {
-        if (glfwGetKey( w, GLFW_KEY_W ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::FORWARD, deltaTime );
-        if (glfwGetKey( w, GLFW_KEY_S ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::BACKWARD, deltaTime );
-        if (glfwGetKey( w, GLFW_KEY_A ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::LEFT, deltaTime );
-        if (glfwGetKey( w, GLFW_KEY_D ) == GLFW_PRESS) camera.ProcessKeyboard( Camera_Movement::RIGHT, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_W ) == GLFW_PRESS)
+            camera.ProcessKeyboard( Camera_Movement::FORWARD, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_S ) == GLFW_PRESS)
+            camera.ProcessKeyboard( Camera_Movement::BACKWARD, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_A ) == GLFW_PRESS)
+            camera.ProcessKeyboard( Camera_Movement::LEFT, deltaTime );
+        if (glfwGetKey( w, GLFW_KEY_D ) == GLFW_PRESS)
+            camera.ProcessKeyboard( Camera_Movement::RIGHT, deltaTime );
     }
 
-    // bond-order keys 1/2/3
     {
         static bool last[ 3 ] = { false,false,false };
-        int keys[ 3 ] = { GLFW_KEY_1,GLFW_KEY_2,GLFW_KEY_3 };
+        const int  keys[ 3 ] = { GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3 };
         for (int i = 0; i < 3; ++i)
         {
-            if (glfwGetKey( w, keys[ i ] ) == GLFW_PRESS)
-            {
-                if (!last[ i ]) nextOrder = i + 1;
-                last[ i ] = true;
-            }
-            else last[ i ] = false;
+            bool now = glfwGetKey( w, keys[ i ] ) == GLFW_PRESS;
+            if (now && !last[ i ])            // edge
+                nextOrder = i + 1;          
+            last[ i ] = now;
         }
     }
 
-    // TAB toggle mode
+    static bool tabLast = false;
+    bool tabNow = glfwGetKey( w, GLFW_KEY_TAB ) == GLFW_PRESS;
+    if (tabNow && !tabLast)                                       // edge
     {
-        static bool tabLast = false;
-        if (glfwGetKey( w, GLFW_KEY_TAB ) == GLFW_PRESS)
+        if (currentMode == ControlMode::FLY_CAMERA)
         {
-            if (!tabLast)
-            {
-                if (currentMode == ControlMode::FLY_CAMERA)
-                {
-                    currentMode = ControlMode::PICK_DRAG;
-                    glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_NORMAL );
-                }
-                else
-                {
-                    currentMode = ControlMode::FLY_CAMERA;
-                    glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
-                }
-            }
-            tabLast = true;
+            currentMode = ControlMode::PICK_DRAG;
+            glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_NORMAL );
         }
-        else tabLast = false;
+        else
+        {
+            currentMode = ControlMode::FLY_CAMERA;
+            glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
+        }
     }
+    tabLast = tabNow;
 }
+
 
 
 
@@ -431,7 +469,7 @@ int main() {
     textRenderer.Init();
 
 
-    buildH2O( atoms );
+   // buildH2O( atoms );
 
     while (!glfwWindowShouldClose( window ))
     {
@@ -474,8 +512,10 @@ int main() {
             10, 210, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
             10, 230, w, h );
-        textRenderer.DrawScreenText( "RClick to delete, LClick + 1/2/3 to make bonds",
+        textRenderer.DrawScreenText( "RClick to delete bonds, LClick + 1/2/3 to make bonds",
             10, 250, w, h );
+        textRenderer.DrawScreenText( "Press F and click to delete atom, Press I to insert",
+            10, 270, w, h );
 
 
         glfwSwapBuffers( window );

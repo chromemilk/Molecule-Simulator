@@ -22,6 +22,7 @@ public:
     void setDirtyLonePairs();
 
     void spawnAtom( const std::string &type );
+    void spawnAtom( const std::string &type, const glm::vec3 &p );
     void addAtom( const Atom &atom );
     void createBond( int ia, int ib, BondType t = BondType::SINGLE );
 
