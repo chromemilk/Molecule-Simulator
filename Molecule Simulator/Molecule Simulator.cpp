@@ -193,7 +193,7 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
 
                 atoms.spawnAtom( buildSymbol, pos );
 
-                buildSymbol.clear();
+               // buildSymbol.clear();
 
                 return;                                      
             }
@@ -307,8 +307,17 @@ void scroll_callback(GLFWwindow*, double, double yoff) {
 
 
 void processInput( GLFWwindow *w ) {
-    if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
-        glfwSetWindowShouldClose( w, true );
+   // if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
+    //    glfwSetWindowShouldClose( w, true );
+
+    if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS) {
+        if (!buildSymbol.empty() &&
+            currentMode == ControlMode::PICK_DRAG) {
+            buildSymbol.clear();
+            return;
+        }
+         glfwSetWindowShouldClose( w, true );
+    }
 
     static bool lastI = false;
     bool nowI = glfwGetKey( w, GLFW_KEY_I ) == GLFW_PRESS;
@@ -512,10 +521,12 @@ int main() {
             10, 210, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
             10, 230, w, h );
-        textRenderer.DrawScreenText( "RClick to delete bonds, LClick + 1/2/3 to make bonds",
+        textRenderer.DrawScreenText( "Press TAB to edit----------",
             10, 250, w, h );
-        textRenderer.DrawScreenText( "Press F and click to delete atom, Press I to insert",
+        textRenderer.DrawScreenText( "  RClick to delete bonds, LClick + 1/2/3 to make bonds",
             10, 270, w, h );
+        textRenderer.DrawScreenText( "  Press I to enter atom, then click screen to place",
+            10, 290, w, h );
 
 
         glfwSwapBuffers( window );
