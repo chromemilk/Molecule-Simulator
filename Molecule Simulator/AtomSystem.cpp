@@ -16,6 +16,9 @@ extern GLFWwindow *window;
 extern Atom *selectedAtom;
 extern Atom *hoveredAtom;
 
+extern Atom *bondFirst;
+extern Atom *breakFirst;   
+
 
 AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
     : maxAtoms( maxAtoms ), textRenderer( tr ) {
@@ -44,7 +47,10 @@ void AtomSystem::render( int w, int h ) {
     for (Bond &b : bonds)   b.render( w, h );
 
     for (Atom &a : atoms)
-        Renderer::DrawAtom( a, w, h, (&a == selectedAtom) || (&a == hoveredAtom) );
+        Renderer::DrawAtom( a, w, h, (&a == selectedAtom) ||
+            (&a == hoveredAtom) ||
+            (&a == bondFirst) ||
+            (&a == breakFirst) );
 
     glEnable( GL_BLEND );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
@@ -531,13 +537,13 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
 
     std::ostringstream os;
     os << e.symbol << " (" << e.atomicNumber << ")  " << e.atomicMass << " u\n"
-        << "EN " << e.electronegativity << "\n"
-        << "Dipole " << glm::length( at.polarityDir ) << "\n"
-        << "LP " << at.lonePairs << "\n"
-        << "Bonds " << at.bondedAtoms.size() << "\n";
-    if (ns) os << "  single " << ns << "\n";
-    if (nd) os << "  double " << nd << "\n";
-    if (nt) os << "  triple " << nt << "\n";
+        << "Electronegativity: " << e.electronegativity << "\n"
+        << "Dipole: " << glm::length( at.polarityDir ) << "\n"
+        << "Lone Pairs: " << at.lonePairs << "\n"
+        << "Bonds: " << at.bondedAtoms.size() << "\n";
+    if (ns) os << "  Single: " << ns << "\n";
+    if (nd) os << "  Double: " << nd << "\n";
+    if (nt) os << "  Triple: " << nt << "\n";
 
     float x = 10, y = 280, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );

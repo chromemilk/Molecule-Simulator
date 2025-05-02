@@ -33,6 +33,9 @@ Atom *hoveredAtom = nullptr;
 
 Atom *bondFirst = nullptr;   // remember first click
 int   nextOrder = 1;         // 1=single default
+Atom *breakFirst = nullptr;   
+
+
 
 float  grabPlaneY = 0.0f;        // y-level at which we grabbed the atom
 glm::vec3 grabRayDir;              // ray direction when grab started
@@ -172,6 +175,14 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         Atom *hit = PickAtom( static_cast<int>(mx), static_cast<int>(my),
             WIN_W, WIN_H,
             atoms.getAtoms(), atoms.getLonePairs() );
+        if (!hit)
+        {              
+            bondFirst = nullptr;
+            dragging = false;
+            selectedAtom = nullptr;
+            return;
+        }
+
         if (!hit) return;
 
         // Is the hit an actual atom or a lone-pair dot?
@@ -222,19 +233,40 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         selectedAtom = nullptr;
     }
 
+
+
     if (button == GLFW_MOUSE_BUTTON_RIGHT &&
         action == GLFW_PRESS &&
         currentMode == ControlMode::PICK_DRAG)
     {
-        glm::vec3 O = camera.Position;
-        glm::vec3 D = screenRay( static_cast<int>(mx), static_cast<int>(my) );
+        Atom *hit = PickAtom( static_cast<int>(mx), static_cast<int>(my),
+            WIN_W, WIN_H, atoms.getAtoms(), {} );
+
+        if (!hit)
+        {                     
+            breakFirst = nullptr;
+            return;
+        }
+
+        if (breakFirst == nullptr)
+        {    // first atom of the pair
+            breakFirst = hit;
+            return;
+        }
+
+        if (breakFirst == hit)
+        {        
+            breakFirst = nullptr;
+            return;
+        }
 
         auto &B = atoms.getBonds();
         for (int i = 0; i < static_cast<int>( B.size() ); ++i)
         {
-            if (B[ i ].contains( O, D ))
+            const bool match = ((B[ i ].atomA == breakFirst && B[ i ].atomB == hit) ||
+                (B[ i ].atomA == hit && B[ i ].atomB == breakFirst));
+            if (match)
             {
-                // remove bond from both atoms’ lists
                 auto erasePtr = []( Atom *tgt, Atom *oth ) {
                     auto &v = tgt->bondedAtoms;
                     v.erase( std::remove( v.begin(), v.end(), oth ), v.end() );
@@ -245,6 +277,7 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
                 break;
             }
         }
+        breakFirst = nullptr;          
     }
 }
 
@@ -441,7 +474,7 @@ int main() {
             10, 210, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
             10, 230, w, h );
-        textRenderer.DrawScreenText( "Right Click = -bond, click atom then 1,2,3 and other atom",
+        textRenderer.DrawScreenText( "RClick to delete, LClick + 1/2/3 to make bonds",
             10, 250, w, h );
 
 
