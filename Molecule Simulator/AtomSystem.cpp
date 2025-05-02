@@ -534,12 +534,27 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     const Element &e = PeriodicTable::Instance().Get( at.type );
 
     int ns = 0, nd = 0, nt = 0;
+	int piBonds = 0, sigmaBonds = 0;
     for (const Bond &b : bonds)
         if (b.atomA == &at || b.atomB == &at)
         {
-            if (b.type == BondType::SINGLE)  ++ns;
-            if (b.type == BondType::DOUBLE)  ++nd;
-            if (b.type == BondType::TRIPLE)  ++nt;
+            if (b.type == BondType::SINGLE)
+            {
+                ++ns;
+				++sigmaBonds;
+            }
+            if (b.type == BondType::DOUBLE)
+            {
+                ++nd;
+				++sigmaBonds;
+				++piBonds;
+            }
+            if (b.type == BondType::TRIPLE)
+            {
+                ++nt;
+				++sigmaBonds;
+				piBonds += 2;
+            }
         }
 
     std::ostringstream os;
@@ -551,6 +566,8 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     if (ns) os << "  Single: " << ns << "\n";
     if (nd) os << "  Double: " << nd << "\n";
     if (nt) os << "  Triple: " << nt << "\n";
+	if (sigmaBonds) os << "  Sigma: " << sigmaBonds << "\n";
+	if (piBonds) os << "  Pi: " << piBonds << "\n";
 
     float x = 10, y = 410, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );

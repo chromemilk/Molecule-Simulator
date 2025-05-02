@@ -193,7 +193,7 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
 
                 atoms.spawnAtom( buildSymbol, pos );
 
-               // buildSymbol.clear();
+                buildSymbol.clear();
 
                 return;                                      
             }
@@ -325,7 +325,7 @@ void processInput( GLFWwindow *w ) {
     {
         const char *inp = tinyfd_inputBox(
             "Insert element / ion",
-            "Enter atomic symbol or ion (e.g. H, Cl-, Mg2+):", "" );
+            "Enter atomic symbol", "" );
         if (inp && *inp)                                           // OK + non-empty
         {
             buildSymbol = inp;         // switch to spawn mode
@@ -521,7 +521,7 @@ int main() {
             10, 210, w, h );
         textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
             10, 230, w, h );
-        textRenderer.DrawScreenText( "Press TAB to edit----------",
+        textRenderer.DrawScreenText( "Press TAB to edit ----------",
             10, 250, w, h );
         textRenderer.DrawScreenText( "  RClick to delete bonds, LClick + 1/2/3 to make bonds",
             10, 270, w, h );
