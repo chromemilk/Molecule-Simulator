@@ -537,3 +537,5 @@ int main() {
     glfwTerminate();
     return 0;
 }
+
+// TODO: Try to determine name for user made molecules, and also fix the weird issue where it cant determine geometry.
