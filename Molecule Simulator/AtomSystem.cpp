@@ -11,6 +11,7 @@
 #include <sstream>
 
 
+// Tell the compiler we for sure have these defined somewhere else
 extern Camera camera;
 extern GLFWwindow *window;
 extern Atom *selectedAtom;
@@ -25,56 +26,88 @@ AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
 }
 
 void AtomSystem::update( float dt ) {
-    for (Bond &b : bonds)           b.applyForce();
+    // Apply forces based on bonds/bond type
+    for (Bond& b : bonds) {
+        b.applyForce();
+    }
+
+    // Use valence shel electron repulsion theory to find and set bond angles dynamically
     applyVSEPRForces( dt );
 
-    for (Atom &a : atoms)           a.update( dt );
+    // Update atoms with respect to delta time
+    for (Atom& a : atoms) {
+        a.update(dt);
+    }
 
+
+    // Set the individual polarities for atoms
     updatePolarities();
 
+    // Get positions for lone pairs based on geometry
     computeLonePairDots();         
 }
 
 
 void AtomSystem::render( int w, int h ) {
     if (firstCentralGeometry.empty())
-        for (Atom &a : atoms)
+        for (Atom& a : atoms) {
+            // Try to find the geometry
             if (a.bondedAtoms.size() >= 2 || a.lonePairs)
             {
-                firstCentralGeometry = determineGeometry( a ); break;
+                firstCentralGeometry = determineGeometry(a);
+                break;
             }
+        }
 
-    for (Bond &b : bonds)   b.render( w, h );
+    for (Bond& b : bonds) {
+        // Render the bonds 
+        b.render(w, h);
+    }
 
-    for (Atom &a : atoms)
-        Renderer::DrawAtom( a, w, h, (&a == selectedAtom) ||
+    for (Atom& a : atoms) {
+        // Draw the atoms, and highlight if conditions are met
+        Renderer::DrawAtom(a, w, h, (&a == selectedAtom) ||
             (&a == hoveredAtom) ||
             (&a == bondFirst) ||
-            (&a == breakFirst) );
+            (&a == breakFirst));
+    }
 
+    // Lone pair transparency 
     glEnable( GL_BLEND );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glDepthMask( GL_FALSE );
 
-    for (Atom &dot : lonePairDots)
-        Renderer::DrawAtom( dot, w, h, &dot == hoveredAtom );
+    // Draw lone pair dots 
+    for (Atom& dot : lonePairDots) {
+        Renderer::DrawAtom(dot, w, h, &dot == hoveredAtom);
+    }
 
+    // Disable transparency
     glDisable( GL_BLEND );
     glDepthMask( GL_TRUE );
 
-    for (Atom &a : atoms)
-        textRenderer.DrawText( a.type + StringUtils::chargeString( a.formalCharge ),
-            a.position, w, h );
+    // Show calculated formal charges
+    for (Atom& a : atoms) {
+        textRenderer.DrawText(a.type + StringUtils::chargeString(a.formalCharge),
+            a.position, w, h);
+    }
 
+    // Render the computed bond angles
     renderBondAngles( w, h );
 
-    if (!firstCentralGeometry.empty())
-        textRenderer.DrawScreenText( "Geometry: " + firstCentralGeometry, 10, 90, w, h );
+    // Render computed geometry
+    if (!firstCentralGeometry.empty()) {
+        textRenderer.DrawScreenText("Geometry: " + firstCentralGeometry, 10, 90, w, h);
+    }
 
-    if (hoveredAtom) drawTooltip( *hoveredAtom, w, h );
+    // Draw the relevant info for the active atom
+    if (hoveredAtom) {
+        drawTooltip(*hoveredAtom, w, h);
+    }
 
     for (Atom &a : atoms)
     {
+        // Draw 3D dipole arrows 
         glm::vec3 s = a.position + glm::vec3( 0, a.radius + .1f, 0 );
         Renderer::DrawArrow( s, s + a.polarityDir * .5f,
             glm::vec3( 1, 0, 0 ), w, h );
@@ -92,22 +125,34 @@ void AtomSystem::setDirtyLonePairs() {
     lonePairsDirty = true;
 }
 
-
+// Create a specified atom in a random place in space
 void AtomSystem::spawnAtom( const std::string &sym ) {
-    if (atoms.size() >= maxAtoms) return;
+    if (atoms.size() >= maxAtoms) {
+        return;
+    }
     atoms.emplace_back( sym, MathUtils::GetRandomVector3( -2, 2 ), 1.f );
     setDirtyLonePairs();
 }
 
+// Add a specified atom
 void AtomSystem::addAtom( const Atom &atom ) {
-    if (atoms.size() < maxAtoms)
-        atoms.push_back( atom );
+    if (atoms.size() < maxAtoms) {
+        atoms.push_back(atom);
+    }
 }
 
+// Create bonds between atoms 
 void AtomSystem::createBond( int ia, int ib, BondType t ) {
     if (ia < 0 || ib < 0 || ia >= atoms.size() || ib >= atoms.size())
     {
-        std::cerr << "bad bond\n"; return;
+        std::cerr << "ERR: BOND INVALID!\n"; return;
+    }
+
+    switch (t)
+    {
+    case BondType::SINGLE:  ++singleBonds;  ++sigmaBonds;            break;
+    case BondType::DOUBLE:  ++doubleBonds; ++sigmaBonds; ++piBonds;  break;
+    case BondType::TRIPLE:  ++tripleBonds; ++sigmaBonds; piBonds += 2; break;
     }
 
     bonds.emplace_back( &atoms[ ia ], &atoms[ ib ], t );
@@ -126,12 +171,14 @@ void AtomSystem::applyVSEPRForces( float dt ) {
         {
             for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
             {
+                // Get angle vertex
                 Atom *neighborA = atom.bondedAtoms[ i ];
                 Atom *neighborB = atom.bondedAtoms[ j ];
-
+                // Normalize position
                 glm::vec3 vecA = glm::normalize( neighborA->position - atom.position );
                 glm::vec3 vecB = glm::normalize( neighborB->position - atom.position );
 
+                // Compute the needed angle, and see how far away we are
                 float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
                 float idealAngle = getIdealBondAngle( atom );
 
@@ -139,11 +186,14 @@ void AtomSystem::applyVSEPRForces( float dt ) {
 
                 if (fabs( angleError ) > 0.5f)
                 {
+                    // Set correction magnitude 
                     glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
 
+                    // Correct the angles
                     if (!neighborA->fixed) neighborA->velocity += correction;
                     if (!neighborB->fixed) neighborB->velocity += correction;
 
+                    // Display saved correction vector 
                     latestCorrectionStrength = glm::length( correction );
                 }
             }
@@ -160,6 +210,7 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
         {
             for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
             {
+                // Angle vertex
                 Atom *neighborA = atom.bondedAtoms[ i ];
                 Atom *neighborB = atom.bondedAtoms[ j ];
 
@@ -171,6 +222,7 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
                 glm::vec3 labelPos = (atom.position + neighborA->position + neighborB->position) / 3.0f;
 
                 float ideal = getIdealBondAngle( atom );
+                // Show actual vs ideal angle
                 std::string label = "Angle: " + std::to_string( int( angle ) ) + " (Ideal: " + std::to_string( int( ideal ) ) + ")";
 
                 textRenderer.DrawText( label, labelPos, windowWidth, windowHeight );
@@ -211,6 +263,7 @@ float AtomSystem::computeDipole() {
 
     for (auto &bond : bonds)
     {
+        // Use partial charges and electronegativity to find polarity vectors 
         float enA = pt.Get( bond.atomA->type ).electronegativity;
         float enB = pt.Get( bond.atomB->type ).electronegativity;
         float deltaEN = fabs( enA - enB );
@@ -222,12 +275,14 @@ float AtomSystem::computeDipole() {
     }
 
     dipoleMag = glm::length( netDipole );
+    // If the sum of all dipoles is 0, then the molecule is not polar 
     isPolar = (dipoleMag > 1e-2f);
     return dipoleMag;
 }
 
 void AtomSystem::spawnAtom( const std::string & sym, const glm::vec3 & pos )   // NEW
  {
+    // Specifc place 
     if (atoms.size() >= maxAtoms) return;
     atoms.emplace_back( sym, pos, 1.f );
     setDirtyLonePairs();
@@ -324,6 +379,7 @@ float AtomSystem::getIdealBondAngle( const Atom &atom ) {
     int lonePairs = atom.lonePairs;
     int totalGroups = bonded + lonePairs;
 
+    // Use electron domains and lone pairs to get ideal bond angles (theoretical)
     if (totalGroups == 2) return 180.0f;
     if (totalGroups == 3) return 120.0f;
     if (totalGroups == 4)
@@ -341,6 +397,8 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
     int lp = a.lonePairs;
     int groups = bondedGroups + lp;
 
+    // Simple geometry calculation
+
     if (groups == 2) return "Linear";
     if (groups == 3) return (lp == 0 ? "Trigonal planar" : "Bent");
     if (groups == 4)
@@ -355,10 +413,14 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
 void AtomSystem::updateFormalCharges() {
     for (Atom &atom : atoms)
     {
+        // Formal charges = valence - nonbonding electrons - 1/2 * bonding electrons
         int bondPairs = 0;
-        for (Bond &b : bonds)
-            if (b.atomA == &atom || b.atomB == &atom)
+        for (Bond& b : bonds) {
+            if (b.atomA == &atom || b.atomB == &atom) {
                 bondPairs += b.bondOrder();   // 1, 2 or 3
+                // Account for single, double, or triple bonds 
+            }
+        }
 
         int V = PeriodicTable::Instance().Get( atom.type ).valenceElectrons;
         int LP = atom.lonePairs;              // already known
@@ -375,8 +437,9 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
     firstCentralGeometry.clear();
     singleBonds = doubleBonds = tripleBonds = sigmaBonds = piBonds = 0;
 
-    for (const auto &s : symbols)
-        spawnAtom( s );
+    for (const auto& s : symbols) {
+        spawnAtom(s);
+    }
 
     for (const auto &[a, b, order] : bondList)
     {
@@ -401,28 +464,37 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
         createBond( a, b, t );
     }
 
+
+    // Electrion stability system 
     glm::vec3 com( 0.0f );
     float     totalM = 0.0f;
     for (const Atom &a : atoms)
     {
         com += a.mass * a.position; totalM += a.mass;
     }
-    if (totalM > 0.0f) com /= totalM;
 
-    for (Atom &a : atoms)
+    if (totalM > 0.0f) {
+        com /= totalM;
+    }
+
+    for (Atom& a : atoms) {
         a.position -= com;
+    }
 
     glm::vec3 P( 0.0f );                      // net linear momentum
-    for (const Atom &a : atoms)
+    for (const Atom& a : atoms) {
         P += a.mass * a.velocity;
+    }
 
     glm::vec3 vCM = (totalM > 0.0f) ? P / totalM : glm::vec3( 0.0f );
-    for (Atom &a : atoms)
+    for (Atom& a : atoms) {
         a.velocity -= vCM;
+    }
 
     // kill residual angular velocity for a calm start
-    for (Atom &a : atoms)
-        a.velocity = glm::vec3( 0.0f );
+    for (Atom& a : atoms) {
+        a.velocity = glm::vec3(0.0f);
+    }
 }
 
 
@@ -571,6 +643,7 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
 
     float x = 10, y = 410, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );
-    while (std::getline( iss, ln ))
-        textRenderer.DrawScreenText( ln, x, y + i * dy, w, h ), ++i;
+    while (std::getline(iss, ln)) {
+        textRenderer.DrawScreenText(ln, x, y + i * dy, w, h), ++i;
+    }
 }

@@ -40,6 +40,9 @@
     <Filter Include="Source Files\strings">
       <UniqueIdentifier>{96b10dc8-30e2-4bd2-918a-713374c766b6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\resonance">
+      <UniqueIdentifier>{55e72e5a-7953-42fa-bb9a-f23b2ac6efb0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Molecule Simulator.cpp">
@@ -92,6 +95,9 @@
     </ClCompile>
     <ClCompile Include="tinyfiledialogs.c">
       <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Resonance.cpp">
+      <Filter>Source Files\resonance</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +157,9 @@
     </ClInclude>
     <ClInclude Include="tinyfiledialogs.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Resonance.h">
+      <Filter>Source Files\resonance</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

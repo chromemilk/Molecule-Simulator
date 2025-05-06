@@ -253,7 +253,7 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
     }
 
 
-
+    /* OLD - WILL STILL WORK BUT DELETING BONDS WILL CAUSE THE SYSTEM TO NOT WORK
     if (button == GLFW_MOUSE_BUTTON_RIGHT &&
         action == GLFW_PRESS &&
         currentMode == ControlMode::PICK_DRAG)
@@ -298,6 +298,73 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         }
         breakFirst = nullptr;          
     }
+    */
+
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT &&
+        action == GLFW_PRESS &&
+        currentMode == ControlMode::PICK_DRAG)
+    {
+        Atom* hit = PickAtom(static_cast<int>(mx), static_cast<int>(my),
+            WIN_W, WIN_H,
+            atoms.getAtoms(), {});        // don’t pick lone pairs
+
+        if (!hit) {              // clicked on empty space
+            breakFirst = nullptr;
+            return;
+        }
+
+        if (breakFirst == nullptr) {   // 1st click of the pair
+            breakFirst = hit;
+            return;
+        }
+
+        if (breakFirst == hit) {       // clicked same atom twice 
+            breakFirst = nullptr;
+            return;
+        }
+
+       
+        auto& B = atoms.getBonds();
+        for (int i = 0; i < static_cast<int>(B.size()); ++i)
+        {
+            bool match =
+                (B[i].atomA == breakFirst && B[i].atomB == hit) ||
+                (B[i].atomA == hit && B[i].atomB == breakFirst);
+
+            if (match)
+            {
+                switch (B[i].type)
+                {
+                case BondType::SINGLE:
+                    --atoms.singleBonds;  --atoms.sigmaBonds;                       break;
+                case BondType::DOUBLE:
+                    --atoms.doubleBonds; --atoms.sigmaBonds; --atoms.piBonds;       break;
+                case BondType::TRIPLE:
+                    --atoms.tripleBonds; --atoms.sigmaBonds;  atoms.piBonds -= 2;    break;
+                }
+
+                auto erasePtr = [](Atom* a, Atom* b)
+                    {
+                        auto& v = a->bondedAtoms;
+                        v.erase(std::remove(v.begin(), v.end(), b), v.end());
+                    };
+                erasePtr(B[i].atomA, B[i].atomB);
+                erasePtr(B[i].atomB, B[i].atomA);
+
+                atoms.bonds.erase(atoms.bonds.begin() + i);
+
+                atoms.firstCentralGeometry.clear();   // force geometry recalc next frame
+                atoms.setDirtyLonePairs();            
+
+                break;  // bond found; exit loop
+            }
+        }
+
+        breakFirst = nullptr;
+        return;
+    }
+
 }
 
 
