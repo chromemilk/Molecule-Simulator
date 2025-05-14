@@ -49,6 +49,7 @@ void AtomSystem::update( float dt ) {
 
 
 void AtomSystem::render( int w, int h ) {
+    // Won't work because it only works when the first atom is spawned and the program fails to reacalculate it
     if (firstCentralGeometry.empty())
         for (Atom& a : atoms) {
             // Try to find the geometry
@@ -407,7 +408,7 @@ std::string AtomSystem::determineGeometry( const Atom &a ) const {
         if (lp == 1) return "Trigonal pyramidal";
         if (lp == 2) return "Bent";
     }
-    return "unknown";
+    return "Unknown; " + a.type;
 }
 
 void AtomSystem::updateFormalCharges() {
