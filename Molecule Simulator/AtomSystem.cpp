@@ -199,6 +199,10 @@ void AtomSystem::applyVSEPRForces( float dt ) {
                     // Set correction magnitude 
                     glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
 
+                    if (correction.length() > 1) {
+                        correction = glm::vec3(1,1,1);
+                    }
+
                     // Correct the angles
                     if (!neighborA->fixed) neighborA->velocity += correction;
                     if (!neighborB->fixed) neighborB->velocity += correction;

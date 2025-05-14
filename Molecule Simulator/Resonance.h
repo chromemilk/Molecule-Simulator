@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <tuple>
+#include <cstdint>
 
 namespace Resonance {
 
@@ -11,30 +12,32 @@ namespace Resonance {
 
     class Generator {
     public:
-        Generator(const std::vector<std::string>& atoms);
 
-        void addAtom(const std::string& symbol);
+        explicit Generator(const std::vector<std::string>& atoms);
+
+        std::vector<int> new2old;   
+        std::vector<int> old2new;   
+
 
         std::vector<std::vector<Bond>> generateStructures();
-
-        std::vector<Bond> bestStructure();
+        std::vector<Bond>              bestStructure();
 
     private:
-        std::vector<std::string> symbols;
-        std::vector<std::pair<int, int>> pairs;  // All unique atom index pairs
+        std::vector<std::string> symbols;   // heavy atoms first, hydrogens last
+        int                      heavyCnt{ 0 };
 
-        int totalElectrons() const;
+        static uint8_t typicalValence(const std::string& sym);
 
-        static int desiredElectrons(const std::string& sym);
+        std::vector<Bond> attachHydrogens(std::vector<uint8_t>& valenceLeft);
 
-        void backtrack(int pairIndex,
-            int electronsLeft,
+        void dfs(int next,
+            std::vector<uint8_t>& valenceLeft,
             std::vector<Bond>& current,
-            std::vector<std::vector<Bond>>& out) const;
+            int& bestCharge,
+            std::vector<std::vector<Bond>>& out);
 
-        int score(const std::vector<Bond>& bonds) const;
+        int formalCharge(const std::vector<Bond>& bonds) const;
     };
 
-} 
-
-#endif // RESONANCE_H
+} // namespace Resonance
+#endif
