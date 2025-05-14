@@ -49,16 +49,24 @@ void AtomSystem::update( float dt ) {
 
 
 void AtomSystem::render( int w, int h ) {
-    // Won't work because it only works when the first atom is spawned and the program fails to reacalculate it
-    if (firstCentralGeometry.empty())
-        for (Atom& a : atoms) {
-            // Try to find the geometry
-            if (a.bondedAtoms.size() >= 2 || a.lonePairs)
-            {
-                firstCentralGeometry = determineGeometry(a);
-                break;
+  
+
+    if (firstCentralGeometry.empty()) {
+        int bestIndex = -1;
+        int maxDomains = -1;
+        for (int i = 0; i < (int)atoms.size(); ++i) {
+            int domains = (int)atoms[i].bondedAtoms.size() + atoms[i].lonePairs;
+            if (domains > maxDomains) {
+                maxDomains = domains;
+                bestIndex = i;
+                
             }
+            
         }
+         if (bestIndex >= 0) {
+             firstCentralGeometry = determineGeometry(atoms[bestIndex]);
+        }
+    }
 
     for (Bond& b : bonds) {
         // Render the bonds 
@@ -124,6 +132,7 @@ std::vector<Bond> &AtomSystem::getBonds() {
 
 void AtomSystem::setDirtyLonePairs() {
     lonePairsDirty = true;
+    firstCentralGeometry.clear();
 }
 
 // Create a specified atom in a random place in space
@@ -224,7 +233,7 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
 
                 float ideal = getIdealBondAngle( atom );
                 // Show actual vs ideal angle
-                std::string label = "Angle: " + std::to_string( int( angle ) ) + " (Ideal: " + std::to_string( int( ideal ) ) + ")";
+                std::string label = "Real Angle: " + std::to_string( angle ) + " (Ideal: " + std::to_string( ideal  ) + ")";
 
                 textRenderer.DrawText( label, labelPos, windowWidth, windowHeight );
             }
