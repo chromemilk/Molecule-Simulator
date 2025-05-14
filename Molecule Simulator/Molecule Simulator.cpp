@@ -8,8 +8,12 @@
 #include "TextRenderer.h"
 #include "AtomSystem.h"
 #include "tinyfiledialogs.h" 
+#include "resonance.h"
 
+#include <cctype>   
 #include <iostream>
+
+
 
 // window size
 constexpr int WIN_W = 1280, WIN_H = 720;
@@ -373,9 +377,56 @@ void scroll_callback(GLFWwindow*, double, double yoff) {
 }
 
 
+static std::vector<std::string> parseFormula(const std::string& formula) {
+    std::vector<std::string> symbols;
+    for (size_t i = 0; i < formula.size(); ) {
+        if (isupper(formula[i])) {
+            // build element symbol
+            std::string elm{ formula[i++] };
+            if (i < formula.size() && islower(formula[i]))
+                elm.push_back(formula[i++]);
+            // read count digits
+            std::string num;
+            while (i < formula.size() && isdigit(formula[i]))
+                num.push_back(formula[i++]);
+            int count = num.empty() ? 1 : std::stoi(num);
+            for (int k = 0; k < count; ++k)
+                symbols.push_back(elm);
+        }
+        else {
+            // skip anything else
+            ++i;
+        }
+    }
+    return symbols;
+}
+
+
 void processInput( GLFWwindow *w ) {
    // if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
     //    glfwSetWindowShouldClose( w, true );
+
+
+    static bool lastShift = false;
+    bool nowShift = glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+    if (nowShift && !lastShift) {
+        const char* inp = tinyfd_inputBox(
+            "Automatic Resonance Build",
+            "Enter molecular formula (e.g. H2O):", ""
+             );
+        if (inp && *inp) {
+            std::string formula = inp;
+            auto symbols = parseFormula(formula);
+            Resonance::Generator gen(symbols);
+            auto bonds = gen.bestStructure();
+            atoms.build(symbols, bonds);
+            currentPrebuiltAtom = formula;
+            
+        }
+        
+    }
+     lastShift = nowShift;
+
 
     if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS) {
         if (!buildSymbol.empty() &&
@@ -594,6 +645,8 @@ int main() {
             10, 270, w, h );
         textRenderer.DrawScreenText( "  Press I to enter atom, then click screen to place",
             10, 290, w, h );
+        textRenderer.DrawScreenText("  Press SHIFT to enter molecule (automatic resonance)",
+            10, 310, w, h);
 
 
         glfwSwapBuffers( window );
