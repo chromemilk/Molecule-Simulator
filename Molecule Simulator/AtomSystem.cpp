@@ -268,27 +268,36 @@ void AtomSystem::updateLonePairs() {
 
 
 float AtomSystem::computeDipole() {
-    netDipole = glm::vec3( 0.0f );
-    auto &pt = PeriodicTable::Instance();
+    netDipole = glm::vec3(0.0f);
 
-    for (auto &bond : bonds)
-    {
-        // Use partial charges and electronegativity to find polarity vectors 
-        float enA = pt.Get( bond.atomA->type ).electronegativity;
-        float enB = pt.Get( bond.atomB->type ).electronegativity;
-        float deltaEN = fabs( enA - enB );
+    auto& pt = PeriodicTable::Instance();
 
-        // use the full displacement vector
+    for (auto& bond : bonds) {
+        // direction only
         glm::vec3 disp = bond.atomB->position - bond.atomA->position;
-        // bond dipole -> (d) EN * (rB - rA)
-        netDipole += disp * deltaEN;
+        glm::vec3 dir = glm::normalize(disp);
+
+        // electronegativities
+        float enA = pt.Get(bond.atomA->type).electronegativity;
+        float enB = pt.Get(bond.atomB->type).electronegativity;
+        float deltaEN = fabs(enA - enB);
+
+        // fractional charge (0..1)
+        float q = deltaEN / (enA + enB);
+
+        netDipole += dir * q;
     }
 
-    dipoleMag = glm::length( netDipole );
-    // If the sum of all dipoles is 0, then the molecule is not polar 
+    // DIP scale 
+    netDipole *= 0.04;
+
+    // verify magnitude 
+    dipoleMag = glm::length(netDipole);
     isPolar = (dipoleMag > 1e-2f);
+
     return dipoleMag;
 }
+
 
 void AtomSystem::spawnAtom( const std::string & sym, const glm::vec3 & pos )   // NEW
  {
