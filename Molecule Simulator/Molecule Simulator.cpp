@@ -9,9 +9,15 @@
 #include "AtomSystem.h"
 #include "tinyfiledialogs.h" 
 #include "resonance.h"
+#include "Raytracing.h"
+
 
 #include <cctype>   
 #include <iostream>
+
+
+static Raytracer ray;
+static bool useRT = false;
 
 
 
@@ -571,8 +577,11 @@ void buildCNminus(AtomSystem& sys) {
 
 int main() {
     glfwInit();
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    //glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
+    //glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+
     glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
     window = glfwCreateWindow( WIN_W, WIN_H, "Molecule Viewer", nullptr, nullptr );
     if (!window)
@@ -593,6 +602,10 @@ int main() {
     glEnable( GL_DEPTH_TEST );
 
     Renderer::Init( &camera );
+
+    ray.init();          
+
+
     textRenderer.Init();
 
 
@@ -610,12 +623,47 @@ int main() {
         glClearColor( 0.05f, 0.05f, 0.05f, 1.f );
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-        int w, h; glfwGetFramebufferSize( window, &w, &h );
-        Renderer::DrawGrid( w, h );
+        int w, h; glfwGetFramebufferSize(window, &w, &h);
+
+        atoms.updateLonePairs();        
+        atoms.updateFormalCharges();    
+
+
+        glDisable(GL_DEPTH_TEST);            // draw on top of RT image
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        Renderer::DrawGrid(w, h);            // plane / lines, use alpha < 1.0
+
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+
+        if (useRT)
+        {
+            std::vector<GPUSphere> gpu;
+            gpu.reserve(atoms.getAtoms().size());
+            for (const Atom& a : atoms.getAtoms())
+                gpu.push_back({ a.position, a.radius });
+
+            ray.setScene(gpu);
+            ray.render(camera, w, h);        // full-screen pass
+        }
+        else
+        {
+            atoms.render(w, h);              // old raster path (spheres + sticks)
+        }
+
+
+
+
+
+   /*   Renderer::DrawGrid(w, h);
+
 
         atoms.updateLonePairs();
         atoms.updateFormalCharges();
         atoms.render( w, h );
+        */
 
 
         float totalPolarityMagnitude = atoms.computeDipole();
@@ -658,4 +706,3 @@ int main() {
     return 0;
 }
 
-// TODO: Try to determine name for user made molecules, and also fix the weird issue where it cant determine geometry.

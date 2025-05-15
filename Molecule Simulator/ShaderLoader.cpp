@@ -67,3 +67,22 @@ unsigned int LoadShader( const std::string &vertexPath, const std::string &fragm
 
     return ID;
 }
+
+
+unsigned int LoadComputeShader(const std::string& path)
+{
+  /*  std::ifstream file(path);  std::stringstream ss;  ss << file.rdbuf();
+    std::string code = ss.str();
+    const char* src = code.c_str();
+
+    GLuint sh = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(sh, 1, &src, nullptr);
+    glCompileShader(sh);
+
+    GLuint prog = glCreateProgram();
+    glAttachShader(prog, sh);
+    glLinkProgram(prog);
+    glDeleteShader(sh);
+    return prog;
+    */
+}

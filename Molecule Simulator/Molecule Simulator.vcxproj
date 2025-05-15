@@ -142,6 +142,7 @@
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="PeriodicTable.cpp" />
+    <ClCompile Include="Raytracing.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Resonance.cpp" />
     <ClCompile Include="Shader.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="Particle.h" />
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="PeriodicTable.h" />
+    <ClInclude Include="Raytracing.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Resonance.h" />
     <ClInclude Include="Shader.h" />
@@ -181,6 +183,7 @@
     <None Include="grid.vert" />
     <None Include="particle_fragment.glsl" />
     <None Include="particle_vertex.glsl" />
+    <None Include="raytrace.comp" />
     <None Include="sphere.frag" />
     <None Include="sphere.vert" />
     <None Include="text.frag" />
