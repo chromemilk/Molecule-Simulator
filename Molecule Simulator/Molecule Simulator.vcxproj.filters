@@ -25,9 +25,6 @@
     <Filter Include="Source Files\resources">
       <UniqueIdentifier>{bffbc2c9-7b36-477a-8f11-fd1c4c3677c3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\particles">
-      <UniqueIdentifier>{15ce6bb9-7805-468d-a0a9-5dd2fd038187}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\molecule">
       <UniqueIdentifier>{cfa5e083-c745-40b6-a15c-f940a7c3fba8}</UniqueIdentifier>
     </Filter>
@@ -53,12 +50,6 @@
     </ClCompile>
     <ClCompile Include="..\external\glad\glad.c">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Particle.cpp">
-      <Filter>Source Files\particles</Filter>
-    </ClCompile>
-    <ClCompile Include="ParticleSystem.cpp">
-      <Filter>Source Files\particles</Filter>
     </ClCompile>
     <ClCompile Include="Shader.cpp">
       <Filter>Source Files\renderer</Filter>
@@ -106,12 +97,6 @@
     </ClInclude>
     <ClInclude Include="..\external\KHR\khrplatform.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Particle.h">
-      <Filter>Source Files\particles</Filter>
-    </ClInclude>
-    <ClInclude Include="ParticleSystem.h">
-      <Filter>Source Files\particles</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Source Files\renderer</Filter>
