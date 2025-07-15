@@ -8,8 +8,18 @@
 #include "TextRenderer.h"
 #include "AtomSystem.h"
 #include "tinyfiledialogs.h" 
+#include "resonance.h"
+#include "Raytracing.h"
 
+
+#include <cctype>   
 #include <iostream>
+
+
+static Raytracer ray;
+static bool useRT = false;
+
+
 
 // window size
 constexpr int WIN_W = 1280, WIN_H = 720;
@@ -253,7 +263,7 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
     }
 
 
-
+    /* OLD - WILL STILL WORK BUT DELETING BONDS WILL CAUSE THE SYSTEM TO NOT WORK
     if (button == GLFW_MOUSE_BUTTON_RIGHT &&
         action == GLFW_PRESS &&
         currentMode == ControlMode::PICK_DRAG)
@@ -298,6 +308,73 @@ void mouse_button_callback( GLFWwindow *, int button, int action, int ) {
         }
         breakFirst = nullptr;          
     }
+    */
+
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT &&
+        action == GLFW_PRESS &&
+        currentMode == ControlMode::PICK_DRAG)
+    {
+        Atom* hit = PickAtom(static_cast<int>(mx), static_cast<int>(my),
+            WIN_W, WIN_H,
+            atoms.getAtoms(), {});        // don’t pick lone pairs
+
+        if (!hit) {              // clicked on empty space
+            breakFirst = nullptr;
+            return;
+        }
+
+        if (breakFirst == nullptr) {   // 1st click of the pair
+            breakFirst = hit;
+            return;
+        }
+
+        if (breakFirst == hit) {       // clicked same atom twice 
+            breakFirst = nullptr;
+            return;
+        }
+
+       
+        auto& B = atoms.getBonds();
+        for (int i = 0; i < static_cast<int>(B.size()); ++i)
+        {
+            bool match =
+                (B[i].atomA == breakFirst && B[i].atomB == hit) ||
+                (B[i].atomA == hit && B[i].atomB == breakFirst);
+
+            if (match)
+            {
+                switch (B[i].type)
+                {
+                case BondType::SINGLE:
+                    --atoms.singleBonds;  --atoms.sigmaBonds;                       break;
+                case BondType::DOUBLE:
+                    --atoms.doubleBonds; --atoms.sigmaBonds; --atoms.piBonds;       break;
+                case BondType::TRIPLE:
+                    --atoms.tripleBonds; --atoms.sigmaBonds;  atoms.piBonds -= 2;    break;
+                }
+
+                auto erasePtr = [](Atom* a, Atom* b)
+                    {
+                        auto& v = a->bondedAtoms;
+                        v.erase(std::remove(v.begin(), v.end(), b), v.end());
+                    };
+                erasePtr(B[i].atomA, B[i].atomB);
+                erasePtr(B[i].atomB, B[i].atomA);
+
+                atoms.bonds.erase(atoms.bonds.begin() + i);
+
+                atoms.firstCentralGeometry.clear();   // force geometry recalc next frame
+                atoms.setDirtyLonePairs();            
+
+                break;  // bond found; exit loop
+            }
+        }
+
+        breakFirst = nullptr;
+        return;
+    }
+
 }
 
 
@@ -306,9 +383,56 @@ void scroll_callback(GLFWwindow*, double, double yoff) {
 }
 
 
+static std::vector<std::string> parseFormula(const std::string& formula) {
+    std::vector<std::string> symbols;
+    for (size_t i = 0; i < formula.size(); ) {
+        if (isupper(formula[i])) {
+            // build element symbol
+            std::string elm{ formula[i++] };
+            if (i < formula.size() && islower(formula[i]))
+                elm.push_back(formula[i++]);
+            // read count digits
+            std::string num;
+            while (i < formula.size() && isdigit(formula[i]))
+                num.push_back(formula[i++]);
+            int count = num.empty() ? 1 : std::stoi(num);
+            for (int k = 0; k < count; ++k)
+                symbols.push_back(elm);
+        }
+        else {
+            // skip anything else
+            ++i;
+        }
+    }
+    return symbols;
+}
+
+
 void processInput( GLFWwindow *w ) {
    // if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS)
     //    glfwSetWindowShouldClose( w, true );
+
+
+    static bool lastShift = false;
+    bool nowShift = glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+    if (nowShift && !lastShift) {
+        const char* inp = tinyfd_inputBox(
+            "Automatic Resonance Build",
+            "Enter molecular formula (e.g. H2O):", ""
+             );
+        if (inp && *inp) {
+            std::string formula = inp;
+            auto symbols = parseFormula(formula);
+            Resonance::Generator gen(symbols);
+            auto bonds = gen.bestStructure();
+            atoms.build(symbols, bonds);
+            currentPrebuiltAtom = formula;
+            
+        }
+        
+    }
+     lastShift = nowShift;
+
 
     if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS) {
         if (!buildSymbol.empty() &&
@@ -453,8 +577,11 @@ void buildCNminus(AtomSystem& sys) {
 
 int main() {
     glfwInit();
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    //glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
+    //glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+
     glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
     window = glfwCreateWindow( WIN_W, WIN_H, "Molecule Viewer", nullptr, nullptr );
     if (!window)
@@ -475,6 +602,10 @@ int main() {
     glEnable( GL_DEPTH_TEST );
 
     Renderer::Init( &camera );
+
+    ray.init();          
+
+
     textRenderer.Init();
 
 
@@ -492,12 +623,47 @@ int main() {
         glClearColor( 0.05f, 0.05f, 0.05f, 1.f );
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-        int w, h; glfwGetFramebufferSize( window, &w, &h );
-        Renderer::DrawGrid( w, h );
+        int w, h; glfwGetFramebufferSize(window, &w, &h);
+
+        atoms.updateLonePairs();        
+        atoms.updateFormalCharges();    
+
+
+        glDisable(GL_DEPTH_TEST);            // draw on top of RT image
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        Renderer::DrawGrid(w, h);            // plane / lines, use alpha < 1.0
+
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+
+        if (useRT)
+        {
+            std::vector<GPUSphere> gpu;
+            gpu.reserve(atoms.getAtoms().size());
+            for (const Atom& a : atoms.getAtoms())
+                gpu.push_back({ a.position, a.radius });
+
+            ray.setScene(gpu);
+            ray.render(camera, w, h);        // full-screen pass
+        }
+        else
+        {
+            atoms.render(w, h);              // old raster path (spheres + sticks)
+        }
+
+
+
+
+
+   /*   Renderer::DrawGrid(w, h);
+
 
         atoms.updateLonePairs();
         atoms.updateFormalCharges();
         atoms.render( w, h );
+        */
 
 
         float totalPolarityMagnitude = atoms.computeDipole();
@@ -527,6 +693,8 @@ int main() {
             10, 270, w, h );
         textRenderer.DrawScreenText( "  Press I to enter atom, then click screen to place",
             10, 290, w, h );
+        textRenderer.DrawScreenText("  Press SHIFT to enter molecule (automatic resonance)",
+            10, 310, w, h);
 
 
         glfwSwapBuffers( window );
@@ -538,4 +706,3 @@ int main() {
     return 0;
 }
 
-// TODO: Try to determine name for user made molecules, and also fix the weird issue where it cant determine geometry.

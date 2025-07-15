@@ -58,6 +58,9 @@ public:
     std::vector<Atom> lonePairDots;
     bool lonePairsDirty = true;
 
+    std::string                firstCentralGeometry;
+
+
 
 private:
     void applyVSEPRForces( float dt );
@@ -70,7 +73,6 @@ private:
     std::vector<Atom>          atoms;
     std::vector<Atom>          lonePairAtoms;      // persistent store of LP-dots
     TextRenderer &textRenderer;
-    std::string                firstCentralGeometry;
 
     glm::vec3                  netDipole{ 0.f };
     float                      dipoleMag{ 0.f };

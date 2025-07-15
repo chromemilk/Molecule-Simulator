@@ -1,4 +1,7 @@
 #include "PeriodicTable.h"
+
+// Entire periodic table with the following: Atomic symbol, atomic number, weight, valence electrions, and electronegativity
+
 PeriodicTable::PeriodicTable() {
     table[ "H" ] = { "H",   1,   1.0080f, 1, 2.20f };
     table[ "He" ] = { "He",  2,   4.0026f, 2, 0.00f };
