@@ -103,14 +103,14 @@ namespace Resonance {
         vector<Bond> &current,
         int &bestCharge,
         vector<vector<Bond>> &out ) {
-        // Remaining valence (could allow radicals)
-        int remAll = std::accumulate( valenceLeft.begin(), valenceLeft.end(), 0 );
+        // we no longer bail out on leftover valence — that leftover will become
+        // lone pairs (or radicals) in formalCharge(), so remove:
+        // if (next == heavyCnt && remAll != 0) return;
 
-
-        // If we've placed all heavy atoms
+        // If all heavy atoms have been considered:
         if (next == heavyCnt)
         {
-            if (remAll != 0) return;  // must use all valence
+            // don’t discard just because some valence remains!
             int qc = formalCharge( current );
             if (qc < bestCharge)
             {
@@ -125,30 +125,29 @@ namespace Resonance {
             return;
         }
 
-        // Try bonds with all previous atoms (bias atom 0 as central)
+        // Try every possible bond (1–3) to every earlier atom
         for (int prev = 0; prev < next; ++prev)
         {
             for (int order = 1; order <= 3; ++order)
             {
-                // Ensure enough valence on both ends
                 if (valenceLeft[ prev ] < order || valenceLeft[ next ] < order)
-                    break;
+                    break;                 // no more bond orders possible
 
-                // Apply bond
+                // make the bond
                 valenceLeft[ prev ] -= order;
                 valenceLeft[ next ] -= order;
                 current.emplace_back( prev, next, order );
 
-                // Recurse to next atom
                 dfs( next + 1, valenceLeft, current, bestCharge, out );
 
-                // Undo
+                // undo
                 current.pop_back();
                 valenceLeft[ prev ] += order;
                 valenceLeft[ next ] += order;
             }
         }
     }
+
 
     vector<vector<Bond>> Generator::generateStructures()
     {
