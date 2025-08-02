@@ -587,6 +587,9 @@ void ShowImGuiMenu() {
                 atoms.clear();
                 currentPrebuiltAtom.clear();
             }
+            ImGui::Separator();
+			ImGui::Checkbox( "Better Molecule Stability", &atoms.betterStabilization );
+			ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
             ImGui::EndTabItem();
         }
 
@@ -711,6 +714,14 @@ int main() {
 
         processInput( window );
         atoms.update( deltaTime );
+
+
+        if (atoms.getAtoms().size() > 1 && atoms.followCamera == true)
+        {
+            glm::vec3 molCenter = atoms.getCenter();
+
+            camera.FollowTargetEuler( molCenter, deltaTime, 1.0f, 12.0f );
+        }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();

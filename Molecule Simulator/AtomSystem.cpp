@@ -32,7 +32,15 @@ void AtomSystem::update( float dt ) {
 
     // Use valence shel electron repulsion theory to find and set bond angles dynamically
     applyVSEPRForces( dt );
-
+    
+    if (betterStabilization)
+    {
+        const float drag = 0.98f;   
+        for (Atom &a : atoms)
+        {
+            a.velocity *= drag;
+        }
+    }
     // Update atoms with respect to delta time
     for (Atom& a : atoms) {
         a.update(dt);
@@ -171,6 +179,12 @@ void AtomSystem::createBond( int ia, int ib, BondType t ) {
     setDirtyLonePairs();        
 }
 
+
+static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
+    float len = glm::length( v );
+    return (len > eps) ? v / len : glm::vec3( 0.0f );
+}
+
 void AtomSystem::applyVSEPRForces( float dt ) {
     for (auto &atom : atoms)
     {
@@ -184,8 +198,8 @@ void AtomSystem::applyVSEPRForces( float dt ) {
                 Atom *neighborA = atom.bondedAtoms[ i ];
                 Atom *neighborB = atom.bondedAtoms[ j ];
                 // Normalize position
-                glm::vec3 vecA = glm::normalize( neighborA->position - atom.position );
-                glm::vec3 vecB = glm::normalize( neighborB->position - atom.position );
+                glm::vec3 vecA = safeNormalize( neighborA->position - atom.position );
+                glm::vec3 vecB = safeNormalize( neighborB->position - atom.position );
 
                 // Compute the needed angle, and see how far away we are
                 float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
@@ -193,19 +207,17 @@ void AtomSystem::applyVSEPRForces( float dt ) {
 
                 float angleError = currentAngle - idealAngle;
 
-                if (fabs( angleError ) > 0.5f)
+                if (fabs( angleError ) > 0.1f)
                 {
-                    // Set correction magnitude 
-                    glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
-
-              
-
-                    // Correct the angles
-                    if (!neighborA->fixed) neighborA->velocity += correction;
-                    if (!neighborB->fixed) neighborB->velocity += correction;
-
-                    // Display saved correction vector 
-                    latestCorrectionStrength = glm::length( correction );
+                    glm::vec3 dir = safeNormalize( vecA + vecB );
+                    if (dir != glm::vec3( 0 ))          // skip the singular case
+                    {
+                        glm::vec3 correction = dir * (angleError * 2.0f * dt); // scale by dt
+                        
+                        if (!neighborA->fixed) neighborA->velocity += correction;
+                        if (!neighborB->fixed) neighborB->velocity += correction;
+                        latestCorrectionStrength = glm::length( correction );
+                    }
                 }
             }
         }
@@ -673,4 +685,12 @@ void AtomSystem::clear() {
 
     firstCentralGeometry.clear();
     lonePairsDirty = true;
+}
+
+glm::vec3 AtomSystem::getCenter() const {
+    if (atoms.empty()) return glm::vec3( 0.0f );
+    glm::vec3 sum( 0.0f );
+    for (const Atom &a : atoms)
+        sum += a.position;
+    return sum / float( atoms.size() );
 }

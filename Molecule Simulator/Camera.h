@@ -27,6 +27,8 @@ public:
 
     Camera( glm::vec3 position );
 
+    void FollowTargetEuler( const glm::vec3 &target, float deltaTime, float speed = 2.0f, float deadZoneAngle = 5.0f );
+
     glm::mat4 GetViewMatrix() const;
     void ProcessKeyboard( Camera_Movement direction, float deltaTime );
     void ProcessMouseMovement( float xoffset, float yoffset );

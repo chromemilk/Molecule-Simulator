@@ -25,6 +25,7 @@ public:
     void spawnAtom( const std::string &type, const glm::vec3 &p );
     void addAtom( const Atom &atom );
     void createBond( int ia, int ib, BondType t = BondType::SINGLE );
+    glm::vec3 getCenter() const;
 
     void updateLonePairs();
     void updateFormalCharges();
@@ -46,6 +47,10 @@ public:
     int tripleBonds = 0;
     int sigmaBonds = 0;
     int piBonds = 0;
+
+    bool betterStabilization = false;
+
+	bool followCamera = false; // follow camera position
 
     const std::vector<Atom> &getAtoms() const {
         return atoms;
