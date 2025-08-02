@@ -39,13 +39,13 @@ public:
     void build( const std::vector<std::string> &symbols,
         const std::vector<std::tuple<int, int, int>> &bonds );
 
-    bool     isPolar = false;
-    float    latestCorrectionStrength = 0.f;
-    int      singleBonds = 0;
-    int      doubleBonds = 0;
-    int      tripleBonds = 0;
-    int      sigmaBonds = 0;
-    int      piBonds = 0;
+    bool isPolar = false;
+    float latestCorrectionStrength = 0.f;
+    int singleBonds = 0;
+    int doubleBonds = 0;
+    int tripleBonds = 0;
+    int sigmaBonds = 0;
+    int piBonds = 0;
 
     const std::vector<Atom> &getAtoms() const {
         return atoms;
@@ -53,12 +53,14 @@ public:
     const std::vector<Atom> &getLonePairs() const;
  
 
-    std::vector<Bond>          bonds;
+    std::vector<Bond> bonds;
 
     std::vector<Atom> lonePairDots;
     bool lonePairsDirty = true;
 
-    std::string                firstCentralGeometry;
+    std::string firstCentralGeometry;
+
+    void clear();
 
 
 
@@ -69,11 +71,11 @@ private:
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
     std::string determineGeometry( const Atom & ) const;
 
-    unsigned                   maxAtoms{ 0 };
-    std::vector<Atom>          atoms;
-    std::vector<Atom>          lonePairAtoms;      // persistent store of LP-dots
+    unsigned maxAtoms{ 0 };
+    std::vector<Atom> atoms;
+    std::vector<Atom> lonePairAtoms;      // persistent store of LP-dots
     TextRenderer &textRenderer;
 
-    glm::vec3                  netDipole{ 0.f };
-    float                      dipoleMag{ 0.f };
+    glm::vec3 netDipole{ 0.f };
+    float dipoleMag{ 0.f };
 };

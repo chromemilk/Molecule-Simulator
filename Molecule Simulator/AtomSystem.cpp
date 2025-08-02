@@ -11,7 +11,6 @@
 #include <sstream>
 
 
-// Tell the compiler we for sure have these defined somewhere else
 extern Camera camera;
 extern GLFWwindow *window;
 extern Atom *selectedAtom;
@@ -468,19 +467,7 @@ void AtomSystem::build( const std::vector<std::string> &symbols,
         if (order == 2) t = BondType::DOUBLE;
         else if (order == 3) t = BondType::TRIPLE;
 
-        // running counts
-        if (order == 1)
-        {
-            singleBonds++;  sigmaBonds++;
-        }
-        if (order == 2)
-        {
-            doubleBonds++;  sigmaBonds++; piBonds++;
-        }
-        if (order == 3)
-        {
-            tripleBonds++;  sigmaBonds++; piBonds += 2;
-        }
+
 
         createBond( a, b, t );
     }
@@ -667,4 +654,23 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     while (std::getline(iss, ln)) {
         textRenderer.DrawScreenText(ln, x, y + i * dy, w, h), ++i;
     }
+}
+
+void AtomSystem::clear() {
+    atoms.clear();
+    lonePairAtoms.clear();
+    lonePairDots.clear();
+
+    bonds.clear();
+
+    singleBonds = doubleBonds = tripleBonds = 0;
+    sigmaBonds = piBonds = 0;
+
+    isPolar = false;
+    latestCorrectionStrength = 0.f;
+    netDipole = glm::vec3( 0.f );
+    dipoleMag = 0.f;
+
+    firstCentralGeometry.clear();
+    lonePairsDirty = true;
 }

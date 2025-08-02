@@ -2,19 +2,24 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <iomanip>
 
 #include "Camera.h"
 #include "Renderer.h"
 #include "TextRenderer.h"
 #include "AtomSystem.h"
-#include "tinyfiledialogs.h" 
 #include "resonance.h"
 #include "Raytracing.h"
+#define IMGUI_IMPL_OPENGL_LOADER_GLAD
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
-#include <cctype>   
 #include <iostream>
-
+#include <vector>
+#include <string>
+#include "tinyfiledialogs.h"
 
 static Raytracer ray;
 static bool useRT = false;
@@ -79,7 +84,8 @@ int atomIndex( const Atom *ptr ) {
     return -1;
 }
 
-
+std::vector<std::string> parseFormula( const std::string &formula );
+void ShowImGuiMenu();
 
 enum class ControlMode
 {
@@ -383,24 +389,25 @@ void scroll_callback(GLFWwindow*, double, double yoff) {
 }
 
 
-static std::vector<std::string> parseFormula(const std::string& formula) {
+
+static std::vector<std::string> parseFormula( const std::string &formula ) {
     std::vector<std::string> symbols;
-    for (size_t i = 0; i < formula.size(); ) {
-        if (isupper(formula[i])) {
-            // build element symbol
-            std::string elm{ formula[i++] };
-            if (i < formula.size() && islower(formula[i]))
-                elm.push_back(formula[i++]);
-            // read count digits
+    for (size_t i = 0; i < formula.size();)
+    {
+        if (isupper( formula[ i ] ))
+        {
+            std::string elm{ formula[ i++ ] };
+            if (i < formula.size() && islower( formula[ i ] ))
+                elm.push_back( formula[ i++ ] );
             std::string num;
-            while (i < formula.size() && isdigit(formula[i]))
-                num.push_back(formula[i++]);
-            int count = num.empty() ? 1 : std::stoi(num);
+            while (i < formula.size() && isdigit( formula[ i ] ))
+                num.push_back( formula[ i++ ] );
+            int count = num.empty() ? 1 : std::stoi( num );
             for (int k = 0; k < count; ++k)
-                symbols.push_back(elm);
+                symbols.push_back( elm );
         }
-        else {
-            // skip anything else
+        else
+        {
             ++i;
         }
     }
@@ -413,26 +420,6 @@ void processInput( GLFWwindow *w ) {
     //    glfwSetWindowShouldClose( w, true );
 
 
-    static bool lastShift = false;
-    bool nowShift = glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
-    if (nowShift && !lastShift) {
-        const char* inp = tinyfd_inputBox(
-            "Automatic Resonance Build",
-            "Enter molecular formula (e.g. H2O):", ""
-             );
-        if (inp && *inp) {
-            std::string formula = inp;
-            auto symbols = parseFormula(formula);
-            Resonance::Generator gen(symbols);
-            auto bonds = gen.bestStructure();
-            atoms.build(symbols, bonds);
-            currentPrebuiltAtom = formula;
-            
-        }
-        
-    }
-     lastShift = nowShift;
-
 
     if (glfwGetKey( w, GLFW_KEY_ESCAPE ) == GLFW_PRESS) {
         if (!buildSymbol.empty() &&
@@ -443,20 +430,7 @@ void processInput( GLFWwindow *w ) {
          glfwSetWindowShouldClose( w, true );
     }
 
-    static bool lastI = false;
-    bool nowI = glfwGetKey( w, GLFW_KEY_I ) == GLFW_PRESS;
-    if (nowI && !lastI)                                            // edge
-    {
-        const char *inp = tinyfd_inputBox(
-            "Insert element / ion",
-            "Enter atomic symbol", "" );
-        if (inp && *inp)                                           // OK + non-empty
-        {
-            buildSymbol = inp;         // switch to spawn mode
-            deleteMode = false;       // leave eraser if it was on
-        }
-    }
-    lastI = nowI;
+ 
 
     static bool lastX = false;
     bool nowX = glfwGetKey( w, GLFW_KEY_X ) == GLFW_PRESS;
@@ -572,6 +546,119 @@ void buildCNminus(AtomSystem& sys) {
     currentPrebuiltAtom = "CN-";
 }
 
+void ShowImGuiMenu() {
+    ImGui::Begin( "Molecule Menu" );
+
+    if (ImGui::BeginTabBar( "MoleculeTabs" ))
+    {
+
+        if (ImGui::BeginTabItem( "Main" ))
+        {
+            static char atomSym[ 8 ] = "";
+            ImGui::InputText( "Atom Symbol", atomSym, IM_ARRAYSIZE( atomSym ) );
+            if (ImGui::Button( "Spawn Atom" ))
+            {
+                if (strlen( atomSym ) > 0)
+                {
+                    glm::vec3 dir = screenRay( WIN_W / 2, WIN_H / 2 );
+                    float t = (0.0f - camera.Position.y) / dir.y;
+                    glm::vec3 pos = camera.Position + dir * t;
+                    atoms.spawnAtom( atomSym, pos );
+                    atomSym[ 0 ] = '\0';
+                }
+            }
+
+            ImGui::Separator();
+
+            static char formulaBuf[ 32 ] = "";
+            ImGui::InputText( "Formula", formulaBuf, IM_ARRAYSIZE( formulaBuf ) );
+            if (ImGui::Button( "Generate (automatic resonance)" ))
+            {
+                auto symbols = parseFormula( formulaBuf );
+                Resonance::Generator gen( symbols );
+                auto bonds = gen.bestStructure();
+                atoms.build( symbols, bonds );
+                currentPrebuiltAtom = formulaBuf;
+                formulaBuf[ 0 ] = '\0';
+            }
+            ImGui::Separator();
+            if (ImGui::Button( "Delete Molecule" ))
+            {
+                atoms.clear();
+                currentPrebuiltAtom.clear();
+            }
+            ImGui::EndTabItem();
+        }
+
+        // ?? Prebuilt Molecules Tab ????????????????????????????????????????????
+        if (ImGui::BeginTabItem( "Prebuilt Molecules" ))
+        {
+            ImGui::Text( "Choose one:" );
+            if (ImGui::Button( "H2O" ))
+            {
+                buildH2O( atoms );
+            }
+            ImGui::SameLine();
+            if (ImGui::Button( "CO2" ))
+            {
+                buildCO2( atoms );
+            }
+
+            if (ImGui::Button( "NH3" ))
+            {
+                buildNH3( atoms );
+            }
+            ImGui::SameLine();
+            if (ImGui::Button( "CH4" ))
+            {
+                buildCH4( atoms );
+            }
+
+            if (ImGui::Button( "NO2-" ))
+            {
+                buildNO2minus( atoms );
+            }
+            ImGui::SameLine();
+            if (ImGui::Button( "HCN" ))
+            {
+                buildHCN( atoms );
+            }
+
+            if (ImGui::Button( "O3" ))
+            {
+                buildO3( atoms );
+            }
+            ImGui::SameLine();
+            if (ImGui::Button( "CN-" ))
+            {
+                buildCNminus( atoms );
+            }
+            ImGui::Separator();
+            if (ImGui::Button( "Delete Molecule" ))
+            {
+                atoms.clear();
+                currentPrebuiltAtom.clear();
+            }
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem( "Instructions" ))
+        {
+            ImGui::BulletText( "W/A/S/D to move camera (in Fly mode)" );
+            ImGui::BulletText( "TAB to toggle Fly or Edit mode" );
+            ImGui::BulletText( "Left-click + drag to reposition atoms" );
+            ImGui::BulletText( "Left-click two atoms + press 1/2/3 for single/double/triple bond" );
+            ImGui::BulletText( "Right-click two atoms to break the bond between them" );
+
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+
+    ImGui::End();
+}
 
 
 
@@ -601,6 +688,12 @@ int main() {
     }
     glEnable( GL_DEPTH_TEST );
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO(); (void)io;
+    ImGui_ImplGlfw_InitForOpenGL( window, true );
+    ImGui_ImplOpenGL3_Init( "#version 460" );
+
     Renderer::Init( &camera );
 
     ray.init();          
@@ -619,6 +712,11 @@ int main() {
 
         processInput( window );
         atoms.update( deltaTime );
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ShowImGuiMenu();
 
         glClearColor( 0.05f, 0.05f, 0.05f, 1.f );
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
@@ -683,24 +781,27 @@ int main() {
             10, 170, w, h );
         textRenderer.DrawScreenText( "PI Bonds: " + std::to_string( atoms.piBonds ),
             10, 190, w, h );
-        textRenderer.DrawScreenText( "Simulation Stability: " + std::to_string( 1 - (0.5 * atoms.latestCorrectionStrength) ),
-            10, 210, w, h );
-        textRenderer.DrawScreenText( "W-A-S-D to move, TAB to toggle",
+        // compute stability as a fraction between 0 and 1
+        float stability = 1.0f - 0.5f * atoms.latestCorrectionStrength;
+        stability = glm::clamp( stability, 0.0f, 1.0f );
+        float stabilityPercent = stability * 100.0f;
+        textRenderer.DrawScreenText(
+            "Simulation Stability: " + std::to_string( stabilityPercent ) + "%",
+            10, 210, w, h
+        );
+        textRenderer.DrawScreenText( "W-A-S-D to move, press TAB to toggle edit mode",
             10, 230, w, h );
-        textRenderer.DrawScreenText( "Press TAB to edit ----------",
-            10, 250, w, h );
-        textRenderer.DrawScreenText( "  RClick to delete bonds, LClick + 1/2/3 to make bonds",
-            10, 270, w, h );
-        textRenderer.DrawScreenText( "  Press I to enter atom, then click screen to place",
-            10, 290, w, h );
-        textRenderer.DrawScreenText("  Press SHIFT to enter molecule (automatic resonance)",
-            10, 310, w, h);
 
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 
         glfwSwapBuffers( window );
         glfwPollEvents();
     }
-
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     Renderer::Shutdown();
     glfwTerminate();
     return 0;

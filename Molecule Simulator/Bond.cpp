@@ -22,6 +22,8 @@ void Bond::applyForce() {
     if (!atomA->fixed) atomA->velocity += F / atomA->mass;
     if (!atomB->fixed) atomB->velocity += -F / atomB->mass;
 }
+
+
 void Bond::render( int w, int h ) const {
     if (!atomA || !atomB) return;
 

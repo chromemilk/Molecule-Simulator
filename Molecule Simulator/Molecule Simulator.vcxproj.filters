@@ -43,6 +43,9 @@
     <Filter Include="Source Files\raytracing">
       <UniqueIdentifier>{54640c69-c083-4a8f-b1cd-2d213dd57024}</UniqueIdentifier>
     </Filter>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{c789088d-df6d-4ab3-aaa8-e6a0e3c4b7d5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Molecule Simulator.cpp">
@@ -96,6 +99,33 @@
     <ClCompile Include="Raytracing.cpp">
       <Filter>Source Files\raytracing</Filter>
     </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_draw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_impl_dx11.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_impl_glfw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_impl_opengl2.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_impl_opengl3.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_impl_win32.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_tables.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\imgui\imgui_widgets.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MathUtils.h">
@@ -105,9 +135,6 @@
       <Filter>Source Files\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\external\glad\glad.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\external\KHR\khrplatform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
@@ -155,6 +182,54 @@
     <ClInclude Include="Raytracing.h">
       <Filter>Source Files\raytracing</Filter>
     </ClInclude>
+    <ClInclude Include="..\external\imgui\imconfig.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_dx11.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_glfw.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_glut.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_metal.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_opengl2.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_opengl3.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_opengl3_loader.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_osx.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_impl_win32.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imgui_internal.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imstb_rectpack.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imstb_textedit.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\imstb_truetype.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\imgui\render.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_vertex.glsl">
@@ -196,5 +271,7 @@
     <None Include="raytrace.comp">
       <Filter>Source Files\shaders</Filter>
     </None>
+    <None Include="..\external\imgui\imgui_impl_metal.mm" />
+    <None Include="..\external\imgui\imgui_impl_osx.mm" />
   </ItemGroup>
 </Project>
