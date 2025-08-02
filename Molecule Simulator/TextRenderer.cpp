@@ -34,9 +34,12 @@ void TextRenderer::Init() {
     textProgram = LoadShader( "text.vert", "text.frag" );
     uniOrtho = glGetUniformLocation( textProgram, "uProjection" );
     uniColor = glGetUniformLocation( textProgram, "uColor" );
+    uniScale = glGetUniformLocation( textProgram, "uScale" );
+
 }
 
-void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight, float alpha ) {
+
+void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight, float alpha, float scale) {
     glm::mat4 V = camera.GetViewMatrix();
     glm::mat4 P = glm::perspective( glm::radians( camera.Zoom ),
         float( windowWidth ) / windowHeight,
@@ -48,17 +51,21 @@ void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos,
     float sx = (ndc.x * 0.5f + 0.5f) * windowWidth;
     float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * windowHeight;
 
-    float tw = float( text.size() ) * 8.0f;
-    sx -= tw * 0.5f;
+    float totalW = float( text.size() ) * 8.0f * scale;
+    sx -= totalW * 0.5f;
 
-
+    float invScale = 1.0f / scale;
     static char buffer[ 9999 ];
-    int quads = stb_easy_font_print( (int)sx, (int)sy,
-        const_cast<char *>(text.c_str()), nullptr, buffer, sizeof( buffer ) );
+    int quads = stb_easy_font_print( int( sx * invScale ),
+        int( sy * invScale ),
+        const_cast<char *>(text.c_str()),
+        nullptr,
+        buffer, sizeof( buffer ) );
     if (quads <= 0) return;
 
     glBindBuffer( GL_ARRAY_BUFFER, textVBO );
-    glBufferData( GL_ARRAY_BUFFER, quads * 4 * 16, buffer, GL_DYNAMIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, quads * 4 * sizeof( float ) * 4,
+        buffer, GL_DYNAMIC_DRAW );
 
     GLboolean wasDepth = glIsEnabled( GL_DEPTH_TEST );
     glDisable( GL_DEPTH_TEST );
@@ -66,9 +73,13 @@ void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos,
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
     glUseProgram( textProgram );
-    glm::mat4 ortho = glm::ortho( 0.0f, (float)windowWidth, (float)windowHeight, 0.0f ); // top-left origin
+    // set ortho
+    glm::mat4 ortho = glm::ortho( 0.0f, float( windowWidth ),
+        float( windowHeight ), 0.0f );
     glUniformMatrix4fv( uniOrtho, 1, GL_FALSE, glm::value_ptr( ortho ) );
+    glUniform1f( uniScale, scale );
     glUniform4f( uniColor, 1, 1, 1, alpha );
+
     glBindVertexArray( textVAO );
     for (int i = 0; i < quads; ++i)
         glDrawArrays( GL_TRIANGLE_FAN, i * 4, 4 );
@@ -76,24 +87,29 @@ void TextRenderer::DrawText( const std::string &text, const glm::vec3 &worldPos,
 
     glUseProgram( 0 );
     if (wasDepth) glEnable( GL_DEPTH_TEST );
-    else glDisable( GL_DEPTH_TEST );
+    else        glDisable( GL_DEPTH_TEST );
     glDisable( GL_BLEND );
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
 }
 
 
 
-void TextRenderer::DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight, float alpha ) {
-    // Same orthographic projection
-    glm::mat4 ortho = glm::ortho( 0.0f, (float)windowWidth, (float)windowHeight, 0.0f );
+void TextRenderer::DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight, float alpha, float scale) {
+    glm::mat4 ortho = glm::ortho( 0.0f, float( windowWidth ),
+        float( windowHeight ), 0.0f );
 
+    float invScale = 1.0f / scale;
     static char buffer[ 9999 ];
-    int quads = stb_easy_font_print( (int)x, (int)y,
-        const_cast<char *>(text.c_str()), nullptr, buffer, sizeof( buffer ) );
+    int quads = stb_easy_font_print( int( x * invScale ),
+        int( y * invScale ),
+        const_cast<char *>(text.c_str()),
+        nullptr,
+        buffer, sizeof( buffer ) );
     if (quads <= 0) return;
 
     glBindBuffer( GL_ARRAY_BUFFER, textVBO );
-    glBufferData( GL_ARRAY_BUFFER, quads * 4 * 16, buffer, GL_DYNAMIC_DRAW );
+    glBufferData( GL_ARRAY_BUFFER, quads * 4 * sizeof( float ) * 4,
+        buffer, GL_DYNAMIC_DRAW );
 
     GLboolean wasDepth = glIsEnabled( GL_DEPTH_TEST );
     glDisable( GL_DEPTH_TEST );
@@ -102,7 +118,9 @@ void TextRenderer::DrawScreenText( const std::string &text, float x, float y, in
 
     glUseProgram( textProgram );
     glUniformMatrix4fv( uniOrtho, 1, GL_FALSE, glm::value_ptr( ortho ) );
+    glUniform1f( uniScale, scale );
     glUniform4f( uniColor, 1, 1, 1, alpha );
+
     glBindVertexArray( textVAO );
     for (int i = 0; i < quads; ++i)
         glDrawArrays( GL_TRIANGLE_FAN, i * 4, 4 );
@@ -110,8 +128,7 @@ void TextRenderer::DrawScreenText( const std::string &text, float x, float y, in
 
     glUseProgram( 0 );
     if (wasDepth) glEnable( GL_DEPTH_TEST );
-    else glDisable( GL_DEPTH_TEST );
+    else        glDisable( GL_DEPTH_TEST );
     glDisable( GL_BLEND );
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
 }
-

@@ -10,9 +10,9 @@ public:
 
     void Init();
 
-    void DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight, float alpha = 1.0f );
+    void DrawText( const std::string &text, const glm::vec3 &worldPos, int windowWidth, int windowHeight, float alpha = 1.0f, float scale = 1.3f );
 
-    void DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight, float alpha = 1.0f );
+    void DrawScreenText( const std::string &text, float x, float y, int windowWidth, int windowHeight, float alpha = 1.0f, float scale = 1.3f );
 
 
 private:
@@ -21,4 +21,5 @@ private:
     unsigned int textProgram;
     int uniOrtho;
     int uniColor;
+	float uniScale = 1.0; // scale factor for text size
 };
