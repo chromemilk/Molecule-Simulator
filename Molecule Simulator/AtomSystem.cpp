@@ -58,22 +58,33 @@ void AtomSystem::update( float dt ) {
 void AtomSystem::render( int w, int h ) {
   
 
-    if (firstCentralGeometry.empty()) {
+    if (firstCentralGeometry.empty())
+    {
         int bestIndex = -1;
-        int maxDomains = -1;
-        for (int i = 0; i < (int)atoms.size(); ++i) {
-            int domains = (int)atoms[i].bondedAtoms.size() + atoms[i].lonePairs;
-            if (domains > maxDomains) {
-                maxDomains = domains;
+        int bestBonds = -1;
+        for (int i = 0; i < (int)atoms.size(); ++i)
+        {
+            int bcount = (int)atoms[ i ].bondedAtoms.size();
+            if (bcount > bestBonds)
+            {
+                bestBonds = bcount;
                 bestIndex = i;
-                
             }
-            
+            else if (bcount == bestBonds && bestIndex >= 0)
+            {
+                // tie-break: prefer fewer lone pairs
+                if (atoms[ i ].lonePairs < atoms[ bestIndex ].lonePairs)
+                {
+                    bestIndex = i;
+                }
+            }
         }
-         if (bestIndex >= 0) {
-             firstCentralGeometry = determineGeometry(atoms[bestIndex]);
+        if (bestIndex >= 0)
+        {
+            firstCentralGeometry = determineGeometry( atoms[ bestIndex ] );
         }
     }
+
 
     for (Bond& b : bonds) {
         // Render the bonds 
@@ -186,43 +197,56 @@ static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
 }
 
 void AtomSystem::applyVSEPRForces( float dt ) {
-    for (auto &atom : atoms)
+    auto &pt = PeriodicTable::Instance();
+    constexpr float ionicThresh = 2.0f;    
+    constexpr float repelStrength = 30.0f;   // lowered from 100
+    constexpr float maxCorr = 0.1f;    // clamp correction magnitude
+    constexpr int   PASSES = 3;       // micro-iterations per frame
+
+    for (int pass = 0; pass < PASSES; ++pass)
     {
-        if (atom.bondedAtoms.size() < 2) continue;
-
-        for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
+        for (auto &center : atoms)
         {
-            for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
+            size_t n = center.bondedAtoms.size();
+            if (n < 2) continue;
+            float enC = pt.Get( center.type ).electronegativity;
+
+            for (size_t i = 0; i < n; ++i)
             {
-                // Get angle vertex
-                Atom *neighborA = atom.bondedAtoms[ i ];
-                Atom *neighborB = atom.bondedAtoms[ j ];
-                // Normalize position
-                glm::vec3 vecA = safeNormalize( neighborA->position - atom.position );
-                glm::vec3 vecB = safeNormalize( neighborB->position - atom.position );
+                Atom *A = center.bondedAtoms[ i ];
+                float enA = pt.Get( A->type ).electronegativity;
+                if (fabs( enC - enA ) > ionicThresh) continue;
 
-                // Compute the needed angle, and see how far away we are
-                float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
-                float idealAngle = getIdealBondAngle( atom );
-
-                float angleError = currentAngle - idealAngle;
-
-                if (fabs( angleError ) > 0.1f)
+                for (size_t j = i + 1; j < n; ++j)
                 {
-                    glm::vec3 dir = safeNormalize( vecA + vecB );
-                    if (dir != glm::vec3( 0 ))          // skip the singular case
-                    {
-                        glm::vec3 correction = dir * (angleError * 2.0f * dt); // scale by dt
-                        
-                        if (!neighborA->fixed) neighborA->velocity += correction;
-                        if (!neighborB->fixed) neighborB->velocity += correction;
-                        latestCorrectionStrength = glm::length( correction );
-                    }
+                    Atom *B = center.bondedAtoms[ j ];
+                    float enB = pt.Get( B->type ).electronegativity;
+                    if (fabs( enC - enB ) > ionicThresh) continue;
+
+                    // direct pairwise repulsion
+                    glm::vec3 delta = A->position - B->position;
+                    float dist = glm::length( delta );
+                    if (dist < 1e-4f) continue;
+                    glm::vec3 dir = delta / dist;
+
+                    // compute and clamp
+                    float mag = repelStrength * dt / (dist * dist);
+                    mag = glm::clamp( mag, 0.0f, maxCorr );
+                    glm::vec3 correction = dir * mag;
+
+                    if (!A->fixed) A->velocity += correction;
+                    if (!B->fixed) B->velocity -= correction;
+
+                    latestCorrectionStrength = glm::length( correction );
                 }
             }
         }
+
+     
     }
 }
+
+
 
 void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
     for (auto &atom : atoms)
@@ -254,32 +278,47 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
     }
 }
 
-// TODO: expanded octets, trigonal bipyramidal, octahedral
 void AtomSystem::updateLonePairs() {
     auto &pt = PeriodicTable::Instance();
     bool anyChange = false;
 
     for (Atom &a : atoms)
     {
-        int bondedElectrons = 0;
+        // count bonding electrons
+        int bondedPairs = 0;
         for (const Bond &b : bonds)
             if (b.atomA == &a || b.atomB == &a)
-                bondedElectrons += 2 * b.bondOrder();
+                bondedPairs += b.bondOrder();
+        int bondedElectrons = bondedPairs * 2;
 
-        const int desired = (a.type == "H") ? 2 : 8;
+        // decide valence target
+        const Element &e = pt.Get( a.type );
+        int an = e.atomicNumber;
+        int valence = e.valenceElectrons;
+        int desired;
+        if (an == 1)  desired = 2;  // H duet
+        else if (an == 4)  desired = 4;  // Be incomplete
+        else if (an == 5 || an == 13 || an == 31 || an == 49)
+            desired = 6;  // B, Al, Ga, In
+        else if (an > 10)  desired = 12; // period-3+ expanded
+        else desired = 8;  // C, N, O, F, Ne, etc.
+
         int newLP = std::max( 0, desired - bondedElectrons ) / 2;
 
-        if (newLP != a.lonePairs)
+        int usedElectrons = bondedElectrons + newLP * 2;
+        int remaining = valence - usedElectrons;
+        if (remaining < 0)  remaining = 0;          // overshoot 
+        bool newRadical = (remaining == 1);     // exactly one
+        if (newLP != a.lonePairs ||
+            newRadical != a.hasRadical)
         {
             a.lonePairs = newLP;
-            anyChange = true;        
+            a.hasRadical = newRadical;
+            anyChange = true;
         }
     }
-
-    if (anyChange) setDirtyLonePairs(); 
+    if (anyChange) setDirtyLonePairs();
 }
-
-
 float AtomSystem::computeDipole() {
     netDipole = glm::vec3(0.0f);
 
@@ -306,8 +345,15 @@ float AtomSystem::computeDipole() {
 
     // verify magnitude 
     dipoleMag = glm::length(netDipole);
-    isPolar = (dipoleMag > 1e-2f);
-
+    if (dipoleMag < 1e-3f)
+    {
+        netDipole = glm::vec3( 0.0f );
+        isPolar = false;
+    }
+    else
+    {
+        isPolar = true;
+    }
     return dipoleMag;
 }
 
@@ -405,41 +451,75 @@ void AtomSystem::computeLonePairPositions(
 }
 
 
-
 float AtomSystem::getIdealBondAngle( const Atom &atom ) {
-    int bonded = atom.bondedAtoms.size();
-    int lonePairs = atom.lonePairs;
-    int totalGroups = bonded + lonePairs;
+    auto &pt = PeriodicTable::Instance();
+    int bonded = (int)atom.bondedAtoms.size();
+    int lp = atom.lonePairs;
+    int radical = atom.hasRadical ? 1 : 0;
+    int total = bonded + lp + radical;
 
-    // Use electron domains and lone pairs to get ideal bond angles (theoretical)
-    if (totalGroups == 2) return 180.0f;
-    if (totalGroups == 3) return 120.0f;
-    if (totalGroups == 4)
+    switch (total)
     {
-        if (lonePairs == 0) return 109.5f;
-        if (lonePairs == 1) return 107.0f;
-        if (lonePairs == 2) return 104.5f;
+    case 0: case 1:
+        return 0.0f;
+    case 2:
+        return 180.0f;
+    case 3:
+        return 120.0f;
+    case 4:
+        return (lp == 0 ? 109.5f : lp == 1 ? 107.0f : 104.5f);
+    case 5:
+        // pentagonal bipyramid 
+        return 90.0f;
+    case 6:
+        // octahedral 
+        return 90.0f;
+    case 7:
+        // pentagonal bipyramidal 
+        return 72.0f;
+    case 8:
+        // square antiprism 
+        return 70.5f;
+    default:
+        // fallback
+        return 90.0f;
     }
-    return 109.5f;
 }
 
-
 std::string AtomSystem::determineGeometry( const Atom &a ) const {
-    int bondedGroups = (int)a.bondedAtoms.size();
+    int bonded = (int)a.bondedAtoms.size();
     int lp = a.lonePairs;
-    int groups = bondedGroups + lp;
+    int radical = a.hasRadical ? 1 : 0;
+    int total = bonded + lp + radical;
 
-    // Simple geometry calculation
-
-    if (groups == 2) return "Linear";
-    if (groups == 3) return (lp == 0 ? "Trigonal planar" : "Bent");
-    if (groups == 4)
+    switch (total)
     {
+    case 0:  return "No electron domains";
+    case 1:  return "Single-domain";
+    case 2:  return "Linear";
+    case 3:  return (lp == 0 ? "Trigonal planar" : "Bent");
+    case 4:
         if (lp == 0) return "Tetrahedral";
-        if (lp == 1) return "Trigonal pyramidal";
-        if (lp == 2) return "Bent";
+        else if (lp == 1) return "Trigonal pyramidal";
+        else             return "Bent";
+    case 5:
+        if (lp == 0) return "Trigonal bipyramidal";
+        else if (lp == 1) return "Seesaw (disphenoidal)";
+        else if (lp == 2) return "T-shaped";
+        else             return "Linear";
+    case 6:
+        if (lp == 0) return "Octahedral";
+        else if (lp == 1) return "Square pyramidal";
+        else if (lp == 2) return "Square planar";
+        else if (lp == 3) return "T-shaped";
+        else             return "Linear";
+    case 7:
+        return "Pentagonal bipyramidal";
+    case 8:
+        return "Square antiprismatic";
+    default:
+        return "Coordination " + std::to_string( total );
     }
-    return "Unknown; " + a.type;
 }
 
 void AtomSystem::updateFormalCharges() {

@@ -15,6 +15,7 @@ public:
     float radius;             // Radius (for rendering size)
     bool fixed = false;       // If true, atom doesn't move
     int lonePairs = 0;
+    bool hasRadical = false;
 	int formalCharge = 0; // Formal charge
     glm::vec3 polarityDir{ 0.f }; // Gives the direction in 3D space
 

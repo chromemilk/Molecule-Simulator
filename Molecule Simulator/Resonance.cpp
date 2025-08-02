@@ -83,11 +83,12 @@ namespace Resonance {
         for (int i = 0;i < n;++i) {
             int desiredE = (symbols[i] == "H" ? 2 : 8);
             int bondingE = bondOrderSum[i] * 2;
-            int loneE = std::max(0, desiredE - bondingE);
+            int loneE = std::max( 0, desiredE - bondingE );
             int lonePairs = loneE / 2;
 
-            int fc = pt.Get(symbols[i]).valenceElectrons - (bondOrderSum[i] + lonePairs);
-            total += std::abs(fc);
+            int fc = pt.Get( symbols[ i ] ).valenceElectrons - (2 * lonePairs) - (bondOrderSum[ i ]);
+
+            total += std::abs( fc );
         }
         return total;
     }
