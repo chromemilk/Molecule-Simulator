@@ -16,8 +16,9 @@ namespace Resonance {
 
 
     static const std::unordered_map<string, uint8_t> kTypV = {
-        {"H",1},{"C",4},{"N",3},{"O",2},{"F",1},{"Cl",1},{"Br",1},{"I",1},
-        {"S",2},{"P",3},{"B",3}
+     {"H",1},{"C",4},{"N",3},{"O",2},{"F",1},
+     {"Cl",3}, {"Br",3}, {"I",3},
+     {"S",6}, {"P",5}, {"B",3}
     };
 
     uint8_t Generator::typicalValence(const string& s) {
@@ -82,6 +83,10 @@ namespace Resonance {
         int total = 0;
         for (int i = 0;i < n;++i) {
             int desiredE = (symbols[i] == "H" ? 2 : 8);
+            if (pt.Get( symbols[ i ] ).atomicNumber > 10 && symbols[i] != "H")
+            {
+                desiredE = 12; // allow expanded octet
+            }
             int bondingE = bondOrderSum[i] * 2;
             int loneE = std::max( 0, desiredE - bondingE );
             int lonePairs = loneE / 2;
@@ -93,42 +98,54 @@ namespace Resonance {
         return total;
     }
 
-    void Generator::dfs(int next,
-        vector<uint8_t>& valenceLeft,
-        vector<Bond>& current,
-        int& bestCharge,
-        vector<vector<Bond>>& out)
-    {
-        // AFTER — check the *whole* list or drop the test
-        int remAll = std::accumulate(valenceLeft.begin(), valenceLeft.end(), 0);
-        if (remAll & 1) return;          // total remaining valence must be even
+    void Generator::dfs( int next,
+        vector<uint8_t> &valenceLeft,
+        vector<Bond> &current,
+        int &bestCharge,
+        vector<vector<Bond>> &out ) {
+        // Remaining valence (could allow radicals)
+        int remAll = std::accumulate( valenceLeft.begin(), valenceLeft.end(), 0 );
 
-        if (next == heavyCnt) {
-            if (remAll != 0) return;                        // unsaturated
-            int qc = formalCharge(current);
-            if (qc < bestCharge) {
+
+        // If we've placed all heavy atoms
+        if (next == heavyCnt)
+        {
+            if (remAll != 0) return;  // must use all valence
+            int qc = formalCharge( current );
+            if (qc < bestCharge)
+            {
                 bestCharge = qc;
                 out.clear();
-                out.push_back(current);
+                out.push_back( current );
             }
-            else if (qc == bestCharge) {
-                out.push_back(current);
+            else if (qc == bestCharge)
+            {
+                out.push_back( current );
             }
             return;
         }
 
-        for (int prev = 0; prev < next; ++prev) {
-            for (int order = 1; order <= 3; ++order) {
-                if (valenceLeft[prev] < order || valenceLeft[next] < order) break;
-                valenceLeft[prev] -= order;
-                valenceLeft[next] -= order;
-                current.emplace_back(prev, next, order);
+        // Try bonds with all previous atoms (bias atom 0 as central)
+        for (int prev = 0; prev < next; ++prev)
+        {
+            for (int order = 1; order <= 3; ++order)
+            {
+                // Ensure enough valence on both ends
+                if (valenceLeft[ prev ] < order || valenceLeft[ next ] < order)
+                    break;
 
-                dfs(next + 1, valenceLeft, current, bestCharge, out);
+                // Apply bond
+                valenceLeft[ prev ] -= order;
+                valenceLeft[ next ] -= order;
+                current.emplace_back( prev, next, order );
 
+                // Recurse to next atom
+                dfs( next + 1, valenceLeft, current, bestCharge, out );
+
+                // Undo
                 current.pop_back();
-                valenceLeft[prev] += order;
-                valenceLeft[next] += order;
+                valenceLeft[ prev ] += order;
+                valenceLeft[ next ] += order;
             }
         }
     }
