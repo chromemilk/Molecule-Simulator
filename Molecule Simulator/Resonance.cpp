@@ -35,24 +35,31 @@ namespace Resonance {
         {"Xe",4},{"Kr",4},{"Ar",2}, // ArF2 possible
     };
 
-    uint8_t Generator::typicalValence( const string &s ) {
-        auto it = kTypV.find( s );
-        if (it != kTypV.end()) return it->second;
-
-        auto &pt = PeriodicTable::Instance();
-        int ve = pt.Get( s ).valenceElectrons;
-
-        // Default: try to fill octet
-        uint8_t val = std::clamp<uint8_t>( (8 - ve) / 2, 1, 4 );
-
-        // For elements beyond period 2, allow expanded valence (up to 6)
-        if (pt.Get( s ).atomicNumber > 10)
+    uint8_t Generator::typicalValence( std::string sym ) {
+        int formalCharge = 0;
+        if (!sym.empty() && (sym.back() == '+' || sym.back() == '-'))
         {
-            val = std::max<uint8_t>( val, 4 ); // allow at least 4
+            char sign = sym.back(); sym.pop_back();
+            int mag = 1;
+            if (!sym.empty() && isdigit( sym.back() ))
+            {
+                mag = sym.back() - '0'; sym.pop_back();
+            }
+            formalCharge = (sign == '+' ? -mag : +mag);
         }
 
+        auto it = kTypV.find( sym );
+        if (it != kTypV.end()) return std::max( uint8_t( 1 ), uint8_t( it->second - formalCharge ) );
+
+        const auto &pt = PeriodicTable::Instance();
+        int ve = pt.Get( sym ).valenceElectrons - formalCharge;
+
+        uint8_t val = std::clamp<uint8_t>( (8 - ve) / 2, 1, 4 );
+        if (pt.Get( sym ).atomicNumber >= 15)            // period ?3
+            val = std::min<uint8_t>( 6, std::max<uint8_t>( val, 4 ) );  // up to d-expansion
         return val;
     }
+
 
     Generator::Generator(const std::vector<std::string>& atoms)
     {

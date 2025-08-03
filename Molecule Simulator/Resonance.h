@@ -26,7 +26,7 @@ namespace Resonance {
         std::vector<std::string> symbols;   // heavy atoms first, hydrogens last
         int                      heavyCnt{ 0 };
 
-        static uint8_t typicalValence(const std::string& sym);
+        static uint8_t typicalValence(std::string sym);
 
         std::vector<Bond> attachHydrogens(std::vector<uint8_t>& valenceLeft);
 

@@ -244,77 +244,91 @@ void AtomSystem::applyVSEPRForces( float dt ) {
     }
 }
 
+struct Dir
+{
+    glm::vec3 v; float r; int idx; bool movable;
+};
+
+
+static void addVirtualLonePairs( const Atom &C, std::vector<Dir> &out ) {
+    static const glm::vec3 TET[ 4 ] = {                       // tetra corners
+        glm::normalize( glm::vec3( 1,  1,  1 ) ),
+        glm::normalize( glm::vec3( -1, -1,  1 ) ),
+        glm::normalize( glm::vec3( 1, -1, -1 ) ),
+        glm::normalize( glm::vec3( -1,  1, -1 ) ) };
+
+    const int need = C.lonePairs;
+    if (need == 0) return;
+
+    std::vector<glm::vec3> cand( TET, TET + 4 );
+    for (Atom *nb : C.bondedAtoms)           // mark used corners
+    {
+        glm::vec3 v = glm::normalize( nb->position - C.position );
+        auto best = std::max_element( cand.begin(), cand.end(),
+            [&]( auto &a, auto &b ) { return glm::dot( v, a ) > glm::dot( v, b ); } );
+        cand.erase( best );
+    }
+    for (int i = 0; i < need && i < (int)cand.size(); ++i)
+        out.push_back( { cand[ i ], 1.0f, -1, false } );
+}
+
+
 void AtomSystem::applyVSEPRAngleFast( float dt ) {
-    constexpr float k = 8.0f;    // spring stiffness
-    constexpr float stepFrac = 0.25f;   // fraction of gradient per frame
-    constexpr float maxMove = 0.15f; 
-    constexpr float deadzone = 2.0f;    
+    const float kRep = 6.0f;                   
+    const float maxStep = glm::radians( 6.0f );      
+    const float velocityDamp = 0.90f;                // extra damping
+
+    std::vector<glm::vec3> torque( atoms.size(), glm::vec3( 0 ) );
 
     for (Atom &C : atoms)
     {
-        const int nb = static_cast<int>(C.bondedAtoms.size());
-        const int lp = C.lonePairs;                 // already computed elsewhere
-        if (nb < 2) continue;
+        int nb = static_cast<int>(C.bondedAtoms.size());
+        int lp = C.lonePairs;
+        if (nb + lp < 2) continue;
 
-        struct Dir
-        {
-            glm::vec3 v; float r; bool movable;
-        };
-        std::vector<Dir> dirs; dirs.reserve( nb + lp );
+        std::vector<Dir> dom; dom.reserve( nb + lp );
 
-        // real bonds
+        /* 1. real bonds */
         for (Atom *B : C.bondedAtoms)
         {
             glm::vec3 d = B->position - C.position;
-            float     r = glm::length( d );
-            if (r < 1e-4f) r = 1e-4f;
-            dirs.push_back( { d / r, r, !B->fixed } );
+            float r = glm::length( d );  if (r < 1e-4f) r = 1e-4f;
+            int idx = static_cast<int>( &B[ 0 ] - &atoms[ 0 ] );
+            dom.push_back( { d / r, r, idx, !B->fixed } );
         }
 
-        if (lp > 0)
-        {
-            glm::mat3 M( 0.0f );
-            for (const auto &d : dirs) M += glm::outerProduct( d.v, d.v );
-            // power-iteration for smallest eigen-vector
-            glm::vec3 n( 1, 0, 0 );
-            for (int it = 0; it < 5; ++it) n = glm::normalize( M * n );
-            glm::vec3 nhat = n;
+        addVirtualLonePairs( C, dom );   // helper shown a few lines below
 
-            if (lp >= 1) dirs.push_back( { nhat, 1.0f, false } );
-            if (lp >= 2) dirs.push_back( { -nhat, 1.0f, false } );
-            /* lp >2 rare – could add remaining tetra corners etc. */
-        }
+        for (int i = 0; i < (int)dom.size(); ++i)
+            for (int j = i + 1; j < (int)dom.size(); ++j)
+            {
+                glm::vec3 diff = dom[ i ].v - dom[ j ].v;
+                float d2 = glm::dot( diff, diff ) + 1e-4f;
+                glm::vec3 f = kRep * diff / (d2 * std::sqrt( d2 ));   
+                if (dom[ i ].movable) torque[ dom[ i ].idx ] += f;
+                if (dom[ j ].movable) torque[ dom[ j ].idx ] -= f;
+            }
+    }
 
-        const int N = dirs.size();
-        if (N < 2) continue;
+    for (size_t idx = 0; idx < atoms.size(); ++idx)
+    {
+        Atom &B = atoms[ idx ];
+        if (B.fixed || glm::length2( torque[ idx ] ) < 1e-10f) continue;
+        Atom *C = B.bondedAtoms.empty() ? nullptr : B.bondedAtoms.front();
+        if (!C) continue;                                // safety
 
-        const float ideal = glm::radians( getIdealBondAngle( C ) );
-        const float cos0 = cosf( ideal );
+        glm::vec3 dir = glm::normalize( B.position - C->position );
+        glm::vec3 tang = torque[ idx ] - glm::dot( torque[ idx ], dir ) * dir;
+        float ang = glm::clamp( glm::length( tang ) * dt, 0.0f, maxStep );
+        if (ang < 1e-5f) continue;
 
-        std::vector<glm::vec3> grad( N, glm::vec3( 0.0f ) );
-        for (int i = 0; i < N; ++i)
-            for (int j = 0; j < N; ++j) if (j != i)
-                grad[ i ] += (glm::dot( dirs[ i ].v, dirs[ j ].v ) - cos0) * dirs[ j ].v;
+        glm::vec3 axis = glm::normalize( glm::cross( dir, tang ) );
+        glm::mat4 R = glm::rotate( glm::mat4( 1.0f ), ang, axis );
+        glm::vec3 newDir = glm::normalize( glm::vec3( R * glm::vec4( dir, 0 ) ) );
 
-        for (int i = 0; i < N; ++i)
-        {
-            if (!dirs[ i ].movable) continue;            // skip phantom & fixed atoms
-
-            glm::vec3 t = grad[ i ] - glm::dot( grad[ i ], dirs[ i ].v ) * dirs[ i ].v; // tangent
-            if (glm::length2( t ) < 1e-8f) continue;
-
-            /* adaptive scaling: gentler near equilibrium */
-            float errDeg = glm::degrees( acos( glm::clamp( glm::length( t ) / k + cos0, -1.0f, 1.0f ) ) ) - glm::degrees( ideal );
-            if (fabs( errDeg ) < deadzone) continue;
-            float scale = glm::clamp( fabs( errDeg ) / 30.0f, 0.1f, 1.0f );
-
-            glm::vec3 delta = -stepFrac * scale * glm::normalize( t ) * dirs[ i ].r;
-            if (glm::length( delta ) > maxMove)
-                delta = glm::normalize( delta ) * maxMove;
-
-            Atom *B = C.bondedAtoms[ i ];     // same ordering as first push
-            B->position += delta;
-        }
+        float bondLen = glm::distance( B.position, C->position );
+        B.position = C->position + newDir * bondLen;
+        B.velocity *= velocityDamp;                      // kill ping-pong
     }
 }
 

@@ -389,29 +389,57 @@ void scroll_callback(GLFWwindow*, double, double yoff) {
 }
 
 
-
-static std::vector<std::string> parseFormula( const std::string &formula ) {
-    std::vector<std::string> symbols;
-    for (size_t i = 0; i < formula.size();)
+std::vector<std::string> parseFormula( const std::string &f ) {
+    struct Frame
     {
-        if (isupper( formula[ i ] ))
+        std::unordered_map<std::string, int> mult; int factor = 1;
+    };
+    std::vector<Frame> st( 1 );              // stack, root frame
+
+    auto mul_into_parent = [&]( Frame &frm, int k )
         {
-            std::string elm{ formula[ i++ ] };
-            if (i < formula.size() && islower( formula[ i ] ))
-                elm.push_back( formula[ i++ ] );
+            for (auto &[sym, n] : frm.mult) st.back().mult[ sym ] += n * k;
+        };
+
+    for (size_t i = 0; i < f.size(); )
+    {
+        char c = f[ i ];
+        if (c == '(' || c == '[')
+        {
+            st.emplace_back(); ++i; continue;
+        }
+
+        if (c == ')' || c == ']')
+        {
+            ++i; std::string num;
+            while (i < f.size() && isdigit( f[ i ] )) num += f[ i++ ];
+            mul_into_parent( st.back(), num.empty() ? 1 : std::stoi( num ) );
+            st.pop_back();  continue;
+        }
+
+        if (isupper( c ))
+        {
+            std::string elm{ c }; ++i;
+            if (i < f.size() && islower( f[ i ] )) elm.push_back( f[ i++ ] );
+
             std::string num;
-            while (i < formula.size() && isdigit( formula[ i ] ))
-                num.push_back( formula[ i++ ] );
-            int count = num.empty() ? 1 : std::stoi( num );
-            for (int k = 0; k < count; ++k)
-                symbols.push_back( elm );
+            while (i < f.size() && isdigit( f[ i ] )) num.push_back( f[ i++ ] );
+            int n = num.empty() ? 1 : std::stoi( num );
+            st.back().mult[ elm ] += n;
+            continue;
         }
-        else
+
+        if (c == '·' || c == '.')
         {
-            ++i;
-        }
+            ++i; continue;
+        }     
+        if (c == '^' || c == '+' || c == '-') break;       // overall charge - skip rest
+        ++i;                                         // whitespace etc.
     }
-    return symbols;
+
+    std::vector<std::string> out;
+    for (auto &[sym, n] : st.front().mult) out.insert( out.end(), n, sym );
+    return out;
 }
 
 
