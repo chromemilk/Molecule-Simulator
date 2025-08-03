@@ -52,6 +52,8 @@ public:
 
 	bool followCamera = false; // follow camera position
 
+    bool fastCorrection = false;
+
     const std::vector<Atom> &getAtoms() const {
         return atoms;
     }
@@ -71,6 +73,7 @@ public:
 
 private:
     void applyVSEPRForces( float dt );
+    void applyVSEPRAngleFast( float dt );
     void renderBondAngles( int w, int h );
     float getIdealBondAngle( const Atom &a );
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );

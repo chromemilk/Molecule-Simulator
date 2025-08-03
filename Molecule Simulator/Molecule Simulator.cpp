@@ -590,6 +590,7 @@ void ShowImGuiMenu() {
             ImGui::Separator();
 			ImGui::Checkbox( "Better Molecule Stability", &atoms.betterStabilization );
 			ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
+			ImGui::Checkbox( "Use energy-minimization VSEPR (multi-angle molecules)", &atoms.fastCorrection );
             ImGui::EndTabItem();
         }
 

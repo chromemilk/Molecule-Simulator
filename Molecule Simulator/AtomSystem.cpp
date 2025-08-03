@@ -9,6 +9,8 @@
 #include <iostream>
 #include <GLFW/glfw3.h>
 #include <sstream>
+#include <glm/ext/quaternion_trigonometric.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 
 extern Camera camera;
@@ -30,8 +32,14 @@ void AtomSystem::update( float dt ) {
         b.applyForce();
     }
 
-    // Use valence shel electron repulsion theory to find and set bond angles dynamically
-    applyVSEPRForces( dt );
+    if (fastCorrection)
+    {
+		applyVSEPRAngleFast( dt );
+    }
+    else
+    {
+        applyVSEPRForces( dt );
+    }
     
     if (betterStabilization)
     {
@@ -195,54 +203,118 @@ static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
     float len = glm::length( v );
     return (len > eps) ? v / len : glm::vec3( 0.0f );
 }
-
 void AtomSystem::applyVSEPRForces( float dt ) {
-    auto &pt = PeriodicTable::Instance();
-    constexpr float ionicThresh = 2.0f;    
-    constexpr float repelStrength = 30.0f;   // lowered from 100
-    constexpr float maxCorr = 0.1f;    // clamp correction magnitude
-    constexpr int   PASSES = 3;       // micro-iterations per frame
-
-    for (int pass = 0; pass < PASSES; ++pass)
+    for (auto &atom : atoms)
     {
-        for (auto &center : atoms)
+        if (atom.bondedAtoms.size() < 2) continue;
+
+        for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
         {
-            size_t n = center.bondedAtoms.size();
-            if (n < 2) continue;
-            float enC = pt.Get( center.type ).electronegativity;
-
-            for (size_t i = 0; i < n; ++i)
+            for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
             {
-                Atom *A = center.bondedAtoms[ i ];
-                float enA = pt.Get( A->type ).electronegativity;
-                if (fabs( enC - enA ) > ionicThresh) continue;
+                // Get angle vertex
+                Atom *neighborA = atom.bondedAtoms[ i ];
+                Atom *neighborB = atom.bondedAtoms[ j ];
+                // Normalize position
+                glm::vec3 vecA = glm::normalize( neighborA->position - atom.position );
+                glm::vec3 vecB = glm::normalize( neighborB->position - atom.position );
 
-                for (size_t j = i + 1; j < n; ++j)
+                // Compute the needed angle, and see how far away we are
+                float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
+                float idealAngle = getIdealBondAngle( atom );
+
+                float angleError = currentAngle - idealAngle;
+
+                if (fabs( angleError ) > 0.5f)
                 {
-                    Atom *B = center.bondedAtoms[ j ];
-                    float enB = pt.Get( B->type ).electronegativity;
-                    if (fabs( enC - enB ) > ionicThresh) continue;
+                    // Set correction magnitude 
+                    glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
 
-                    // direct pairwise repulsion
-                    glm::vec3 delta = A->position - B->position;
-                    float dist = glm::length( delta );
-                    if (dist < 1e-4f) continue;
-                    glm::vec3 dir = delta / dist;
 
-                    // compute and clamp
-                    float mag = repelStrength * dt / (dist * dist);
-                    mag = glm::clamp( mag, 0.0f, maxCorr );
-                    glm::vec3 correction = dir * mag;
 
-                    if (!A->fixed) A->velocity += correction;
-                    if (!B->fixed) B->velocity -= correction;
+                    // Correct the angles
+                    if (!neighborA->fixed) neighborA->velocity += correction;
+                    if (!neighborB->fixed) neighborB->velocity += correction;
 
+                    // Display saved correction vector 
                     latestCorrectionStrength = glm::length( correction );
                 }
             }
         }
+    }
+}
 
-     
+void AtomSystem::applyVSEPRAngleFast( float dt ) {
+    constexpr float k = 8.0f;    // spring stiffness
+    constexpr float stepFrac = 0.25f;   // fraction of gradient per frame
+    constexpr float maxMove = 0.15f; 
+    constexpr float deadzone = 2.0f;    
+
+    for (Atom &C : atoms)
+    {
+        const int nb = static_cast<int>(C.bondedAtoms.size());
+        const int lp = C.lonePairs;                 // already computed elsewhere
+        if (nb < 2) continue;
+
+        struct Dir
+        {
+            glm::vec3 v; float r; bool movable;
+        };
+        std::vector<Dir> dirs; dirs.reserve( nb + lp );
+
+        // real bonds
+        for (Atom *B : C.bondedAtoms)
+        {
+            glm::vec3 d = B->position - C.position;
+            float     r = glm::length( d );
+            if (r < 1e-4f) r = 1e-4f;
+            dirs.push_back( { d / r, r, !B->fixed } );
+        }
+
+        if (lp > 0)
+        {
+            glm::mat3 M( 0.0f );
+            for (const auto &d : dirs) M += glm::outerProduct( d.v, d.v );
+            // power-iteration for smallest eigen-vector
+            glm::vec3 n( 1, 0, 0 );
+            for (int it = 0; it < 5; ++it) n = glm::normalize( M * n );
+            glm::vec3 nhat = n;
+
+            if (lp >= 1) dirs.push_back( { nhat, 1.0f, false } );
+            if (lp >= 2) dirs.push_back( { -nhat, 1.0f, false } );
+            /* lp >2 rare – could add remaining tetra corners etc. */
+        }
+
+        const int N = dirs.size();
+        if (N < 2) continue;
+
+        const float ideal = glm::radians( getIdealBondAngle( C ) );
+        const float cos0 = cosf( ideal );
+
+        std::vector<glm::vec3> grad( N, glm::vec3( 0.0f ) );
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < N; ++j) if (j != i)
+                grad[ i ] += (glm::dot( dirs[ i ].v, dirs[ j ].v ) - cos0) * dirs[ j ].v;
+
+        for (int i = 0; i < N; ++i)
+        {
+            if (!dirs[ i ].movable) continue;            // skip phantom & fixed atoms
+
+            glm::vec3 t = grad[ i ] - glm::dot( grad[ i ], dirs[ i ].v ) * dirs[ i ].v; // tangent
+            if (glm::length2( t ) < 1e-8f) continue;
+
+            /* adaptive scaling: gentler near equilibrium */
+            float errDeg = glm::degrees( acos( glm::clamp( glm::length( t ) / k + cos0, -1.0f, 1.0f ) ) ) - glm::degrees( ideal );
+            if (fabs( errDeg ) < deadzone) continue;
+            float scale = glm::clamp( fabs( errDeg ) / 30.0f, 0.1f, 1.0f );
+
+            glm::vec3 delta = -stepFrac * scale * glm::normalize( t ) * dirs[ i ].r;
+            if (glm::length( delta ) > maxMove)
+                delta = glm::normalize( delta ) * maxMove;
+
+            Atom *B = C.bondedAtoms[ i ];     // same ordering as first push
+            B->position += delta;
+        }
     }
 }
 
