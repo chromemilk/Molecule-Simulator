@@ -11,6 +11,7 @@
 #include <sstream>
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include "Resonance.h" 
 
 
 
@@ -172,6 +173,10 @@ const std::vector<Atom> &AtomSystem::getLonePairs() const {
     return lonePairDots;
 }
 std::vector<Bond> &AtomSystem::getBonds() {
+    return bonds;
+}
+
+const std::vector<Bond> &AtomSystem::getBonds() const {
     return bonds;
 }
 
@@ -353,36 +358,51 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
 }
 
 
-
 void AtomSystem::renderBondAngles( int windowWidth, int windowHeight,
     const Camera &camera ) {
-    // reuse proj/view from above
-    glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ), float( windowWidth ) / float( windowHeight ), 0.1f, 100.0f );
+    glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ),
+        float( windowWidth ) / float( windowHeight ),
+        0.1f, 100.0f );
     glm::mat4 view = camera.GetViewMatrix();
+
+    glm::vec4 viewport( 0.f, 0.f, float( windowWidth ), float( windowHeight ) );
 
     for (Atom &atom : atoms)
     {
         if (atom.bondedAtoms.size() < 2) continue;
+
         for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
+        {
             for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
             {
-                auto A = atom.bondedAtoms[ i ], B = atom.bondedAtoms[ j ];
-                float angle = glm::degrees( acos(
-                    glm::clamp( glm::dot( glm::normalize( A->position - atom.position ),
-                        glm::normalize( B->position - atom.position ) ),
-                        -1.0f, 1.0f ) ) );
-                glm::vec3 labelPos = (atom.position * 0.7f + (A->position + B->position) * 0.2f);
+                Atom *A = atom.bondedAtoms[ i ];
+                Atom *B = atom.bondedAtoms[ j ];
 
-                glm::vec4 clip = proj * view * glm::vec4( labelPos, 1.0f );
-                if (clip.w <= 0.0f) continue;
-                glm::vec3 ndc = glm::vec3( clip ) / clip.w;
-                float sx = (ndc.x * 0.5f + 0.5f) * windowWidth;
-                float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * windowHeight;
+                // compute angle
+                glm::vec3 vA = glm::normalize( A->position - atom.position );
+                glm::vec3 vB = glm::normalize( B->position - atom.position );
+                float angle = glm::degrees( acos( glm::clamp( glm::dot( vA, vB ), -1.f, 1.f ) ) );
+
+                // compute label world-space position on the bisector
+                glm::vec3 bisector = glm::normalize( vA + vB );
+                float   offset = 0.4f;  // adjust to taste
+                glm::vec3 labelWorld = atom.position + bisector * offset;
+
+                // project to screen
+                glm::vec3 win = glm::project( labelWorld, view, proj, viewport );
+                if (win.z < 0.0f || win.z > 1.0f) continue; // behind camera or beyond far plane
+
+                // convert to top-left origin if needed
+                float sx = win.x;
+                float sy = windowHeight - win.y;
+
+                // draw
                 std::string label =
                     "[ANGLE] Real: " + std::to_string( int( angle ) ) +
                     " | Ideal: " + std::to_string( int( getIdealBondAngle( atom ) ) );
                 textRenderer.DrawScreenText( label, sx, sy, windowWidth, windowHeight );
             }
+        }
     }
 }
 
@@ -886,4 +906,10 @@ glm::vec3 AtomSystem::getCenter() const {
     for (const Atom &a : atoms)
         sum += a.position;
     return sum / float( atoms.size() );
+}
+
+void AtomSystem::build( const std::vector<std::string> &symbols ) {
+    Resonance::Generator gen( symbols );
+    const auto bonds = gen.bestStructure();
+    build( symbols, bonds );
 }

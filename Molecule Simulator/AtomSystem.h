@@ -19,6 +19,9 @@ public:
 
     std::vector<Bond> &getBonds();
 
+    const std::vector<Bond> &getBonds() const;
+
+
     void setDirtyLonePairs();
 
     void spawnAtom( const std::string &type );
@@ -39,6 +42,8 @@ public:
 
     void build( const std::vector<std::string> &symbols,
         const std::vector<std::tuple<int, int, int>> &bonds );
+
+    void build( const std::vector<std::string> &symbols );
 
     bool isPolar = false;
     float latestCorrectionStrength = 0.f;

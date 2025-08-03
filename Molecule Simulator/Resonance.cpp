@@ -17,7 +17,7 @@ namespace Resonance {
 
     static const std::unordered_map<string, uint8_t> kTypV = {
         // Hydrogen and common organic elements
-        {"H",1},{"C",4},{"N",3},{"O",2},
+        {"H",1},{"C",4},{"N",4},{"O",2},
 
         // Halogens
         {"F",1},{"Cl",3},{"Br",3},{"I",3},
@@ -175,9 +175,9 @@ namespace Resonance {
 
         for (int prev = 0; prev < next; ++prev)
         {
-       
+            // Uncommet if qerid bonding behavior starrts to happen
             if (prev != 0 && next != 0) continue; // only bond to central
-            for (int order = 1; order <= 3; ++order)
+            for (int order = std::min<int>( 3, std::min( valenceLeft[ prev ], valenceLeft[ next ] ) ); order >= 1; order--)
             {
                 if (valenceLeft[ prev ] < order || valenceLeft[ next ] < order)
                     break;
@@ -225,4 +225,4 @@ namespace Resonance {
     }
 
 
-} // namespace Resonance
+} 

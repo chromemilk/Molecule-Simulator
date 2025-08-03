@@ -21,7 +21,7 @@
 #include <iostream>
 
 
-static Raytracer ray;          // optional raster vs. RT demo
+static Raytracer ray;          
 static bool      useRT = false;
 
 //--------------------------------------------------
@@ -71,7 +71,8 @@ int main() {
     InitInputHandler( ctx );
 
     // Unit tests
-  //  runMoleculeTests( textRenderer );
+   // runMoleculeTests( atoms, textRenderer );
+    //return 0;
 
     float lastFrame = 0.f;
     while (!glfwWindowShouldClose( window ))

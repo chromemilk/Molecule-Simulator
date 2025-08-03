@@ -73,7 +73,7 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::Separator();
             ImGui::Checkbox( "Better Molecule Stability", &atoms.betterStabilization );
             ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
-            ImGui::Checkbox( "Energy-minimization VSEPR", &atoms.fastCorrection );
+            ImGui::Checkbox( "Energy-minimization VSEPR (better for more complex molecules)", &atoms.fastCorrection );
 
             ImGui::EndTabItem();
         }

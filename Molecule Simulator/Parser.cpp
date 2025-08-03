@@ -1,48 +1,101 @@
 #include "Parser.h"
 #include <unordered_map>
+#include <vector>
+#include <string>
 #include <cctype>
+#include <stdexcept>
 
-std::vector<std::string> parseFormula( const std::string &f ) {
+namespace
+{
+
+  
+    inline std::size_t readNumber( const std::string &s, std::size_t &i ) {
+        std::size_t start = i;
+        while (i < s.size() && std::isdigit( s[ i ] )) ++i;
+        return (i == start) ? 1 : std::stoul( s.substr( start, i - start ) );
+    }
+
     struct Frame
     {
-        std::unordered_map<std::string, int> mult;
+        std::unordered_map<std::string, int> mult;  
+        std::size_t leading = 1;                   
     };
-    std::vector<Frame> st( 1 );
-    auto mul_into_parent = [&]( Frame &frm, int k ) {
-        for (auto &p : frm.mult) st.back().mult[ p.first ] += p.second * k;
+
+} 
+
+
+std::vector<std::string> parseFormula( const std::string &f ) {
+    std::vector<Frame> st{ Frame{} };            // root frame
+    std::size_t i = 0;
+
+    std::size_t pending = 0;                   
+
+    auto flushPending = [&]() {               // reset after we have consumed it
+        std::size_t v = pending ? pending : 1;
+        pending = 0;
+        return v;
         };
-    for (size_t i = 0; i < f.size();)
+
+    while (i < f.size())
     {
         char c = f[ i ];
-        if (c == '(' || c == '[')
+
+        if (std::isdigit( c ))
         {
-            st.emplace_back(); ++i; continue;
-        }
-        if (c == ')' || c == ']')
-        {
-            ++i; std::string num;
-            while (i < f.size() && isdigit( f[ i ] )) num += f[ i++ ];
-            mul_into_parent( st.back(), num.empty() ? 1 : std::stoi( num ) );
-            st.pop_back(); continue;
-        }
-        if (isupper( c ))
-        {
-            std::string elm{ c }; ++i;
-            if (i < f.size() && islower( f[ i ] )) elm.push_back( f[ i++ ] );
-            std::string num;
-            while (i < f.size() && isdigit( f[ i ] )) num.push_back( f[ i++ ] );
-            st.back().mult[ elm ] += num.empty() ? 1 : std::stoi( num );
+            pending = readNumber( f, i );        
             continue;
         }
+
+        if (c == '(' || c == '[' || c == '{')
+        {
+            st.push_back( Frame{} );             
+            st.back().leading = flushPending();
+            ++i;
+            continue;
+        }
+
+        if (c == ')' || c == ']' || c == '}')
+        {
+            ++i;
+            std::size_t trailing = readNumber( f, i );     // number after the ')', default 1
+            std::size_t factor = st.back().leading * trailing;
+
+            auto grp = std::move( st.back().mult );
+            st.pop_back();
+            for (auto &kv : grp)
+                st.back().mult[ kv.first ] += kv.second * static_cast<int>(factor);
+            continue;
+        }
+
+        if (std::isupper( c ))
+        {
+            std::string sym;
+            sym.push_back( c ); ++i;
+            if (i < f.size() && std::islower( f[ i ] )) sym.push_back( f[ i++ ] );
+
+            std::size_t count = readNumber( f, i );
+            std::size_t factor = flushPending();
+
+            st.back().mult[ sym ] += static_cast<int>( factor * count );
+            continue;
+        }
+
         if (c == '·' || c == '.')
         {
-            ++i; continue;
+            ++i;
+            continue;                          
         }
-        if (c == '+' || c == '-' || c == '^') break;
-        ++i;
+
+      
+        if (c == '+' || c == '-' || c == '^')
+            break;
+
+        throw std::runtime_error( std::string( "Unexpected character in formula: '" ) + c + "'" );
     }
+
     std::vector<std::string> out;
-    for (auto &p : st.front().mult)
-        out.insert( out.end(), p.second, p.first );
+    for (auto &kv : st.front().mult)
+        out.insert( out.end(), kv.second, kv.first );
+
     return out;
 }
