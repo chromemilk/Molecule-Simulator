@@ -125,27 +125,27 @@ namespace Resonance {
             return;
         }
 
-        // Try every possible bond (1–3) to every earlier atom
         for (int prev = 0; prev < next; ++prev)
         {
+            // Only allow central atom (0) to form >1 bond,
+            // but let side atoms bond ONLY to central, not each other.
+            if (prev != 0 && next != 0) continue; // only bond to central
             for (int order = 1; order <= 3; ++order)
             {
                 if (valenceLeft[ prev ] < order || valenceLeft[ next ] < order)
-                    break;                 // no more bond orders possible
-
-                // make the bond
+                    break;
                 valenceLeft[ prev ] -= order;
                 valenceLeft[ next ] -= order;
                 current.emplace_back( prev, next, order );
 
                 dfs( next + 1, valenceLeft, current, bestCharge, out );
 
-                // undo
                 current.pop_back();
                 valenceLeft[ prev ] += order;
                 valenceLeft[ next ] += order;
             }
         }
+
     }
 
 
