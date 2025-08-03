@@ -16,17 +16,42 @@ namespace Resonance {
 
 
     static const std::unordered_map<string, uint8_t> kTypV = {
-     {"H",1},{"C",4},{"N",3},{"O",2},{"F",1},
-     {"Cl",3}, {"Br",3}, {"I",3},
-     {"S",6}, {"P",5}, {"B",3}
+        // Hydrogen and common organic elements
+        {"H",1},{"C",4},{"N",3},{"O",2},
+
+        // Halogens
+        {"F",1},{"Cl",3},{"Br",3},{"I",3},
+
+        // Pnictogens (group 15)
+        {"P",5},{"As",5},{"Sb",5},
+
+        // Chalcogens (group 16)
+        {"S",6},{"Se",6},{"Te",6},
+
+        // Boron family
+        {"B",3},{"Al",3},{"Ga",3},{"In",3},
+
+        // Noble gases (allow hypervalent species)
+        {"Xe",4},{"Kr",4},{"Ar",2}, // ArF2 possible
     };
 
-    uint8_t Generator::typicalValence(const string& s) {
-        auto it = kTypV.find(s);
+    uint8_t Generator::typicalValence( const string &s ) {
+        auto it = kTypV.find( s );
         if (it != kTypV.end()) return it->second;
-        auto& pt = PeriodicTable::Instance();
-        int ve = pt.Get(s).valenceElectrons;
-        return std::clamp<uint8_t>((8 - ve) / 2, 1, 4);
+
+        auto &pt = PeriodicTable::Instance();
+        int ve = pt.Get( s ).valenceElectrons;
+
+        // Default: try to fill octet
+        uint8_t val = std::clamp<uint8_t>( (8 - ve) / 2, 1, 4 );
+
+        // For elements beyond period 2, allow expanded valence (up to 6)
+        if (pt.Get( s ).atomicNumber > 10)
+        {
+            val = std::max<uint8_t>( val, 4 ); // allow at least 4
+        }
+
+        return val;
     }
 
     Generator::Generator(const std::vector<std::string>& atoms)
@@ -51,23 +76,38 @@ namespace Resonance {
     }
 
 
-    vector<Bond> Generator::attachHydrogens(vector<uint8_t>& valenceLeft)
-    {
+    vector<Bond> Generator::attachHydrogens( vector<uint8_t> &valenceLeft ) {
         const int totalH = symbols.size() - heavyCnt;
         vector<Bond> out;
         int hIndex = heavyCnt;                 // first H in `symbols`
 
-   
-        for (int h = 0; h < totalH; ++h, ++hIndex) {
-            auto it = std::max_element(valenceLeft.begin(), valenceLeft.end());
-            int i = std::distance(valenceLeft.begin(), it);
-            if (*it == 0)
-                throw std::runtime_error("Ran out of valence while attaching H");
-            (*it)--;
-            out.emplace_back(i, hIndex, 1);    // single bond
+        for (int h = 0; h < totalH; ++h, ++hIndex)
+        {
+            // Find max valence left but skip noble gases
+            int i = -1;
+            int maxVal = -1;
+            for (int idx = 0; idx < heavyCnt; ++idx)
+            {
+                const string &sym = symbols[ idx ];
+                // Skip noble gases for H attachment
+                if (sym == "Xe" || sym == "Kr" || sym == "Ar")
+                    continue;
+                if (valenceLeft[ idx ] > maxVal)
+                {
+                    maxVal = valenceLeft[ idx ];
+                    i = idx;
+                }
+            }
+
+            if (i == -1 || maxVal == 0)
+                throw std::runtime_error( "Ran out of valence while attaching H" );
+
+            valenceLeft[ i ]--;
+            out.emplace_back( i, hIndex, 1 );    // single bond
         }
         return out;
     }
+
 
     int Generator::formalCharge(const vector<Bond>& bonds) const
     {
@@ -82,10 +122,12 @@ namespace Resonance {
 
         int total = 0;
         for (int i = 0;i < n;++i) {
-            int desiredE = (symbols[i] == "H" ? 2 : 8);
-            if (pt.Get( symbols[ i ] ).atomicNumber > 10 && symbols[i] != "H")
+            int desiredE = (symbols[ i ] == "H" ? 2 : 8);
+            if ((symbols[ i ] == "Xe" || symbols[ i ] == "Kr" || symbols[ i ] == "Cl" ||
+                symbols[ i ] == "Br" || symbols[ i ] == "I" || symbols[ i ] == "P" || symbols[ i ] == "S")
+                && pt.Get( symbols[ i ] ).atomicNumber > 10)
             {
-                desiredE = 12; // allow expanded octet
+                desiredE = 12;
             }
             int bondingE = bondOrderSum[i] * 2;
             int loneE = std::max( 0, desiredE - bondingE );
@@ -104,8 +146,7 @@ namespace Resonance {
         int &bestCharge,
         vector<vector<Bond>> &out ) {
         // we no longer bail out on leftover valence — that leftover will become
-        // lone pairs (or radicals) in formalCharge(), so remove:
-        // if (next == heavyCnt && remAll != 0) return;
+
 
         // If all heavy atoms have been considered:
         if (next == heavyCnt)
