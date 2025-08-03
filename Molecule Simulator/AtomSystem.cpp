@@ -13,14 +13,6 @@
 #include <glm/gtx/quaternion.hpp>
 
 
-extern Camera camera;
-extern GLFWwindow *window;
-extern Atom *selectedAtom;
-extern Atom *hoveredAtom;
-
-extern Atom *bondFirst;
-extern Atom *breakFirst;   
-
 
 AtomSystem::AtomSystem( unsigned int maxAtoms, TextRenderer &tr )
     : maxAtoms( maxAtoms ), textRenderer( tr ) {
@@ -63,8 +55,8 @@ void AtomSystem::update( float dt ) {
 }
 
 
-void AtomSystem::render( int w, int h ) {
-  
+void AtomSystem::render( int w, int h, Atom *selectedAtom, Atom *hoveredAtom, Atom *bondFirst, Atom *breakFirst, const Camera &camera ) {
+
 
     if (firstCentralGeometry.empty())
     {
@@ -94,17 +86,19 @@ void AtomSystem::render( int w, int h ) {
     }
 
 
-    for (Bond& b : bonds) {
+    for (Bond &b : bonds)
+    {
         // Render the bonds 
-        b.render(w, h);
+        b.render( w, h );
     }
 
-    for (Atom& a : atoms) {
+    for (Atom &a : atoms)
+    {
         // Draw the atoms, and highlight if conditions are met
-        Renderer::DrawAtom(a, w, h, (&a == selectedAtom) ||
+        Renderer::DrawAtom( a, w, h, (&a == selectedAtom) ||
             (&a == hoveredAtom) ||
             (&a == bondFirst) ||
-            (&a == breakFirst));
+            (&a == breakFirst) );
     }
 
     // Lone pair transparency 
@@ -113,8 +107,9 @@ void AtomSystem::render( int w, int h ) {
     glDepthMask( GL_FALSE );
 
     // Draw lone pair dots 
-    for (Atom& dot : lonePairDots) {
-        Renderer::DrawAtom(dot, w, h, &dot == hoveredAtom);
+    for (Atom &dot : lonePairDots)
+    {
+        Renderer::DrawAtom( dot, w, h, &dot == hoveredAtom );
     }
 
     // Disable transparency
@@ -122,13 +117,37 @@ void AtomSystem::render( int w, int h ) {
     glDepthMask( GL_TRUE );
 
     // Show calculated formal charges
-    for (Atom& a : atoms) {
+ /*   for (Atom &a : atoms) {
         textRenderer.DrawText(a.type + StringUtils::chargeString(a.formalCharge),
             a.position, w, h);
+    }*/
+
+    // build projection & view once
+    glm::mat4 proj = glm::perspective(
+        glm::radians( camera.Zoom ),
+        float( w ) / float( h ),
+        0.1f, 100.0f
+    );
+    glm::mat4 view = camera.GetViewMatrix();
+
+    for (Atom &a : atoms)
+    {
+        glm::vec4 clip = proj * view * glm::vec4( a.position, 1.0f );
+        if (clip.w <= 0.0f) continue;         // behind camera
+        glm::vec3 ndc = glm::vec3( clip ) / clip.w;
+        float sx = (ndc.x * 0.5f + 0.5f) * w;
+        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * h;
+
+        textRenderer.DrawScreenText(
+            a.type + StringUtils::chargeString( a.formalCharge ),
+            sx, sy, w, h
+        );
     }
 
+
+
     // Render the computed bond angles
-    renderBondAngles( w, h );
+    renderBondAngles( w, h, camera );
 
     // Render computed geometry
     if (!firstCentralGeometry.empty()) {
@@ -203,6 +222,7 @@ static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
     float len = glm::length( v );
     return (len > eps) ? v / len : glm::vec3( 0.0f );
 }
+
 void AtomSystem::applyVSEPRForces( float dt ) {
     for (auto &atom : atoms)
     {
@@ -334,35 +354,42 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
 
 
 
-void AtomSystem::renderBondAngles( int windowWidth, int windowHeight ) {
-    for (auto &atom : atoms)
+void AtomSystem::renderBondAngles( int windowWidth, int windowHeight,
+    const Camera &camera ) {
+    // reuse proj/view from above
+    glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ), float( windowWidth ) / float( windowHeight ), 0.1f, 100.0f );
+    glm::mat4 view = camera.GetViewMatrix();
+
+    for (Atom &atom : atoms)
     {
         if (atom.bondedAtoms.size() < 2) continue;
-
         for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
-        {
             for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
             {
-                // Angle vertex
-                Atom *neighborA = atom.bondedAtoms[ i ];
-                Atom *neighborB = atom.bondedAtoms[ j ];
+                auto A = atom.bondedAtoms[ i ], B = atom.bondedAtoms[ j ];
+                float angle = glm::degrees( acos(
+                    glm::clamp( glm::dot( glm::normalize( A->position - atom.position ),
+                        glm::normalize( B->position - atom.position ) ),
+                        -1.0f, 1.0f ) ) );
+                glm::vec3 labelPos = (atom.position * 0.7f + (A->position + B->position) * 0.2f);
 
-                glm::vec3 vecA = neighborA->position - atom.position;
-                glm::vec3 vecB = neighborB->position - atom.position;
-
-                float angle = glm::degrees( acos( glm::clamp( glm::dot( glm::normalize( vecA ), glm::normalize( vecB ) ), -1.0f, 1.0f ) ) );
-
-                glm::vec3 labelPos = (atom.position + neighborA->position + neighborB->position) / 3.0f;
-
-                float ideal = getIdealBondAngle( atom );
-                // Show actual vs ideal angle
-                std::string label = "Real Angle: " + std::to_string( angle ) + " (Ideal: " + std::to_string( ideal  ) + ")";
-
-                textRenderer.DrawText( label, labelPos, windowWidth, windowHeight );
+                glm::vec4 clip = proj * view * glm::vec4( labelPos, 1.0f );
+                if (clip.w <= 0.0f) continue;
+                glm::vec3 ndc = glm::vec3( clip ) / clip.w;
+                float sx = (ndc.x * 0.5f + 0.5f) * windowWidth;
+                float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * windowHeight;
+                std::string label =
+                    "[ANGLE] Real: " + std::to_string( int( angle ) ) +
+                    " | Ideal: " + std::to_string( int( getIdealBondAngle( atom ) ) );
+                textRenderer.DrawScreenText( label, sx, sy, windowWidth, windowHeight );
             }
-        }
     }
 }
+
+
+
+
+
 
 void AtomSystem::updateLonePairs() {
     auto &pt = PeriodicTable::Instance();

@@ -55,7 +55,7 @@ namespace Resonance {
         int ve = pt.Get( sym ).valenceElectrons - formalCharge;
 
         uint8_t val = std::clamp<uint8_t>( (8 - ve) / 2, 1, 4 );
-        if (pt.Get( sym ).atomicNumber >= 15)            // period ?3
+        if (pt.Get( sym ).atomicNumber >= 15)            // period 3
             val = std::min<uint8_t>( 6, std::max<uint8_t>( val, 4 ) );  // up to d-expansion
         return val;
     }
@@ -86,7 +86,7 @@ namespace Resonance {
     vector<Bond> Generator::attachHydrogens( vector<uint8_t> &valenceLeft ) {
         const int totalH = symbols.size() - heavyCnt;
         vector<Bond> out;
-        int hIndex = heavyCnt;                 // first H in `symbols`
+        int hIndex = heavyCnt;                 // first H in symbols
 
         for (int h = 0; h < totalH; ++h, ++hIndex)
         {
@@ -175,8 +175,7 @@ namespace Resonance {
 
         for (int prev = 0; prev < next; ++prev)
         {
-            // Only allow central atom (0) to form >1 bond,
-            // but let side atoms bond ONLY to central, not each other.
+       
             if (prev != 0 && next != 0) continue; // only bond to central
             for (int order = 1; order <= 3; ++order)
             {

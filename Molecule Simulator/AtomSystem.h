@@ -1,4 +1,3 @@
-// AtomSystem.h
 #pragma once
 
 #include <vector>
@@ -8,6 +7,7 @@
 #include "Atom.h"
 #include "Bond.h"
 #include "TextRenderer.h"
+#include "Camera.h"
 
 class AtomSystem
 {
@@ -15,7 +15,7 @@ public:
     AtomSystem( unsigned maxAtoms, TextRenderer &tr );
 
     void update( float dt );
-    void render( int w, int h );
+    void render( int w, int h, Atom *selected, Atom *hovered, Atom *bondFirst, Atom *breakFirst, const Camera &camera );
 
     std::vector<Bond> &getBonds();
 
@@ -74,7 +74,7 @@ public:
 private:
     void applyVSEPRForces( float dt );
     void applyVSEPRAngleFast( float dt );
-    void renderBondAngles( int w, int h );
+    void renderBondAngles( int w, int h, const Camera &camera );
     float getIdealBondAngle( const Atom &a );
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
     std::string determineGeometry( const Atom & ) const;

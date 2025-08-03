@@ -46,19 +46,19 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{c789088d-df6d-4ab3-aaa8-e6a0e3c4b7d5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\gui">
+      <UniqueIdentifier>{a60a9fb2-5a09-43a4-a092-160a288adcc8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\unit tests">
+      <UniqueIdentifier>{d177b528-260a-411a-98cd-a266b36321bf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Molecule Simulator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MathUtils.cpp">
       <Filter>Source Files\math</Filter>
     </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <Filter>Source Files\renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="..\external\glad\glad.c">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Shader.cpp">
       <Filter>Source Files\renderer</Filter>
@@ -111,9 +111,6 @@
     <ClCompile Include="..\external\imgui\imgui_impl_glfw.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\external\imgui\imgui_impl_opengl2.cpp">
-      <Filter>imgui</Filter>
-    </ClCompile>
     <ClCompile Include="..\external\imgui\imgui_impl_opengl3.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
@@ -125,6 +122,27 @@
     </ClCompile>
     <ClCompile Include="..\external\imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\glad\glad.c">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser.cpp">
+      <Filter>Source Files\molecule</Filter>
+    </ClCompile>
+    <ClCompile Include="UI.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="InputHandler.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="Tests.cpp">
+      <Filter>Source Files\unit tests</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Globals.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -200,9 +218,6 @@
     <ClInclude Include="..\external\imgui\imgui_impl_metal.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="..\external\imgui\imgui_impl_opengl2.h">
-      <Filter>imgui</Filter>
-    </ClInclude>
     <ClInclude Include="..\external\imgui\imgui_impl_opengl3.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -229,6 +244,18 @@
     </ClInclude>
     <ClInclude Include="..\external\imgui\render.h">
       <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser.h">
+      <Filter>Source Files\molecule</Filter>
+    </ClInclude>
+    <ClInclude Include="UI.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="InputHandler.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="Tests.h">
+      <Filter>Source Files\unit tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
