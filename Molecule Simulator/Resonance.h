@@ -9,11 +9,14 @@
 namespace Resonance {
 
     using Bond = std::tuple<int, int, int>;
+    
+    inline bool centralOnlyBonding = false;
 
     class Generator {
     public:
 
         explicit Generator(const std::vector<std::string>& atoms);
+
 
         std::vector<int> new2old;   
         std::vector<int> old2new;   

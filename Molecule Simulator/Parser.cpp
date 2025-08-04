@@ -1,101 +1,96 @@
+// Parser.cpp  – robust formula ? list<string> atoms
 #include "Parser.h"
-#include <unordered_map>
-#include <vector>
-#include <string>
+#include "PeriodicTable.h"
 #include <cctype>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-namespace
-{
+using std::string;
+using std::vector;
 
-  
-    inline std::size_t readNumber( const std::string &s, std::size_t &i ) {
-        std::size_t start = i;
-        while (i < s.size() && std::isdigit( s[ i ] )) ++i;
-        return (i == start) ? 1 : std::stoul( s.substr( start, i - start ) );
-    }
 
-    struct Frame
+static std::size_t readNumber( const string &s, std::size_t &i ) {
+    std::size_t start = i;
+    while (i < s.size() && std::isdigit( s[ i ] )) ++i;
+    return (i == start) ? 1 : std::stoul( s.substr( start, i - start ) );
+}
+
+
+static void parseInto( const string &s, std::size_t &i, char endTok,
+    std::unordered_map<string, int> &counts,
+    std::size_t scopeMult ) {
+    while (i < s.size())
     {
-        std::unordered_map<std::string, int> mult;  
-        std::size_t leading = 1;                   
-    };
+        char c = s[ i ];
 
-} 
-
-
-std::vector<std::string> parseFormula( const std::string &f ) {
-    std::vector<Frame> st{ Frame{} };            // root frame
-    std::size_t i = 0;
-
-    std::size_t pending = 0;                   
-
-    auto flushPending = [&]() {               // reset after we have consumed it
-        std::size_t v = pending ? pending : 1;
-        pending = 0;
-        return v;
-        };
-
-    while (i < f.size())
-    {
-        char c = f[ i ];
-
-        if (std::isdigit( c ))
+        if (endTok && c == endTok)
         {
-            pending = readNumber( f, i );        
+            ++i; return;
+        }
+
+        if (std::isupper( c ))
+        {
+            string sym;  sym.push_back( c );  ++i;
+            if (i < s.size() && std::islower( s[ i ] )) sym.push_back( s[ i++ ] );
+
+            std::size_t n = readNumber( s, i );
+            counts[ sym ] += static_cast<int>( scopeMult * n );
             continue;
         }
 
         if (c == '(' || c == '[' || c == '{')
         {
-            st.push_back( Frame{} );             
-            st.back().leading = flushPending();
-            ++i;
+            char open = c, close = (c == '(' ? ')' : c == '[' ? ']' : '}');
+            ++i;                                       // skip open
+            std::unordered_map<string, int> sub;
+            parseInto( s, i, close, sub, 1 );            // recurse
+            std::size_t grpMult = readNumber( s, i );    // multiplier after bracket
+            for (auto &kv : sub)
+                counts[ kv.first ] += kv.second * static_cast<int>(scopeMult * grpMult);
             continue;
         }
 
-        if (c == ')' || c == ']' || c == '}')
+        if (c == '+' || c == '-' || c == '^') return;
+
+        throw std::runtime_error( "Unexpected character in formula: '" + string( 1, c ) + "'" );
+    }
+}
+
+
+vector<string> parseFormula( const string &formula ) {
+    vector<string> segments;
+    {
+        string buf;
+        for (char ch : formula)
         {
-            ++i;
-            std::size_t trailing = readNumber( f, i );     // number after the ')', default 1
-            std::size_t factor = st.back().leading * trailing;
-
-            auto grp = std::move( st.back().mult );
-            st.pop_back();
-            for (auto &kv : grp)
-                st.back().mult[ kv.first ] += kv.second * static_cast<int>(factor);
-            continue;
+            if (ch == '.' || ch == '·')
+            {
+                if (!buf.empty())
+                {
+                    segments.push_back( buf ); buf.clear();
+                }
+            }
+            else                     buf.push_back( ch );
         }
-
-        if (std::isupper( c ))
-        {
-            std::string sym;
-            sym.push_back( c ); ++i;
-            if (i < f.size() && std::islower( f[ i ] )) sym.push_back( f[ i++ ] );
-
-            std::size_t count = readNumber( f, i );
-            std::size_t factor = flushPending();
-
-            st.back().mult[ sym ] += static_cast<int>( factor * count );
-            continue;
-        }
-
-        if (c == '·' || c == '.')
-        {
-            ++i;
-            continue;                          
-        }
-
-      
-        if (c == '+' || c == '-' || c == '^')
-            break;
-
-        throw std::runtime_error( std::string( "Unexpected character in formula: '" ) + c + "'" );
+        if (!buf.empty()) segments.push_back( buf );
     }
 
-    std::vector<std::string> out;
-    for (auto &kv : st.front().mult)
-        out.insert( out.end(), kv.second, kv.first );
+    std::unordered_map<string, int> total;
 
-    return out;
+    for (std::size_t idx = 0; idx < segments.size(); ++idx)
+    {
+        const string &seg = segments[ idx ];
+        std::size_t i = 0;
+        std::size_t leading = (idx == 0) ? 1 : readNumber( seg, i );   
+        parseInto( seg, i, 0, total, leading );
+    }
+
+    vector<string> atoms;
+    atoms.reserve( total.size() * 2 );                 // rough guess
+    for (auto &kv : total)
+        atoms.insert( atoms.end(), kv.second, kv.first );
+
+    return atoms;
 }

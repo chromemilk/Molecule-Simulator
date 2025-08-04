@@ -72,10 +72,16 @@ void ShowImGuiMenu( InputContext &ctx ) {
             }
 
             ImGui::Separator();
-            ImGui::Checkbox( "Better Molecule Stability", &atoms.betterStabilization );
+            ImGui::Checkbox( "Molecule Stability System", &atoms.betterStabilization );
             ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
             ImGui::Checkbox( "Energy-minimization VSEPR (better for more complex molecules)", &atoms.fastCorrection );
-
+            ImGui::Checkbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text( "Enable this for molecules that only have one central atom; it helps with performance" );
+                ImGui::EndTooltip();
+            }
             ImGui::EndTabItem();
         }
 

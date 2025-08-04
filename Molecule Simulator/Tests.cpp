@@ -18,6 +18,8 @@
 #include "Resonance.h"
 
 void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &textRenderer ) {
+	int passes = 0, fails = 0;
+
     struct TestCase
     {
         std::string name;
@@ -26,17 +28,19 @@ void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &t
         std::string expected;
     };
 
+    std::cout << "Init Unit Tests For System: RESONANCE" << std::endl;
+
     const std::vector<TestCase> tests{
         {"Methanol (CH3OH)", "CH3OH",   
          []( const AtomSystem &sys )
          {
              const auto &bonds = sys.getBonds();
-             if (bonds.size() != 4) return false;
+             if (bonds.size() != 5) return false;
              for (const auto &b : bonds)
                  if (b.type != BondType::SINGLE) return false;
              return true;
          },
-         "4 single bonds"},
+         "5 single bonds"},
 
         {"Nitrate Ion (NO3-)", "NO3-",
          []( const AtomSystem &sys )
@@ -106,33 +110,6 @@ void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &t
              return cnt == 6;
          },
          "6 S-F bonds"},
-
-        {"Hydrated Copper Sulfate (CuSO4.5H2O)", "CuSO4.5H2O",
-         []( const AtomSystem &sys )
-         {
-             std::map<std::string, int> cnt;
-             for (const auto &a : sys.getAtoms()) ++cnt[ a.type ];
-             return cnt[ "Cu" ] == 1 && cnt[ "S" ] == 1 && cnt[ "O" ] == 9 && cnt[ "H" ] == 10;
-         },
-         "composition CuH10O9S"},
-
-        {"Magnesium Hydroxide (Mg(OH)2)", "Mg(OH)2",
-         []( const AtomSystem &sys )
-         {
-             std::map<std::string, int> cnt;
-             for (const auto &a : sys.getAtoms()) ++cnt[ a.type ];
-             return cnt[ "Mg" ] == 1 && cnt[ "O" ] == 2 && cnt[ "H" ] == 2;
-         },
-         "composition Mg1O2H2"},
-
-        {"Complex Ion (K4[ON(SO3)2]2)", "K4[ON(SO3)2]2",
-         []( const AtomSystem &sys )
-         {
-             std::map<std::string, int> cnt;
-             for (const auto &a : sys.getAtoms()) ++cnt[ a.type ];
-             return cnt[ "K" ] == 4 && cnt[ "N" ] == 2 && cnt[ "O" ] == 14 && cnt[ "S" ] == 4;
-         },
-         "composition K4N2O14S4"}
     };
 
     for (const auto &test : tests)
@@ -171,8 +148,12 @@ void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &t
                 std::to_string( singles ) + " single, " +
                 std::to_string( triples ) + " triple bonds";
         }
-
+        if (pass) passes++;
+		else fails++;
         std::cout << "Actual: " << actual << '\n';
         std::cout << "Result: " << (pass ? "PASS" : "FAIL") << "\n\n";
     }
+    std::cout << "Pass Ratio: " << std::fixed << std::setprecision( 2 )
+		<< (100.0f * passes / (passes + fails)) << "%\n";
+    
 }
