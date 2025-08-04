@@ -4,6 +4,7 @@
 #include "Parser.h"
 #include "resonance.h"
 #include "tinyfiledialogs.h"
+#include "Tests.h"
 
 namespace
 {
@@ -109,6 +110,11 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::BulletText( "Left-drag – move atoms" );
             ImGui::BulletText( "Click 2 atoms + 1/2/3 – bond order" );
             ImGui::BulletText( "Right-click 2 atoms – break bond" );
+            ImGui::Separator();
+            if (ImGui::Button( "Run Unit Tests" ))
+            {
+                runMoleculeTests( atoms, *ctx.textRenderer );
+            }
             ImGui::EndTabItem();
         }
 

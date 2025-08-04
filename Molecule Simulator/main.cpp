@@ -6,7 +6,6 @@
 #include "Parser.h"
 #include "UI.h"
 #include "InputHandler.h"
-#include "Tests.h"
 
 #include "Camera.h"
 #include "AtomSystem.h"
@@ -70,10 +69,7 @@ int main() {
     ctx.textRenderer = &textRenderer;
     InitInputHandler( ctx );
 
-    // Unit tests
-   // runMoleculeTests( atoms, textRenderer );
-    //return 0;
-
+   
     float lastFrame = 0.f;
     while (!glfwWindowShouldClose( window ))
     {
