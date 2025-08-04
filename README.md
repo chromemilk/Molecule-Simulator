@@ -1,104 +1,187 @@
 # 3D Molecule Simulator
 
-A real-time 3D simulation written in modern C++ using OpenGL - 2530 lines so far
+A real-time 3D molecular structure and dynamics simulator written in modern C++17 using OpenGL 3.3+, GLFW, GLAD, GLM, and ImGui. Interactively build, visualize, and analyze molecular geometries and properties with force-based simulation and VSEPR methods.
 
-## Example
+## Table of Contents
 
+* [Features](#features)
+* [Preview](#preview)
+* [Controls & UI](#controls--ui)
+* [Architecture & Operations](#architecture--operations)
+* [Tech Stack](#tech-stack)
+* [Prerequisites](#prerequisites)
+* [Building & Running](#building--running)
+* [Planned Features](#planned-features)
+* [Future Ideas](#future-ideas)
+* [License](#license)
+* [Acknowledgements](#acknowledgements)
 
+## Features
 
-## V1
-https://github.com/user-attachments/assets/ce91ff1f-9787-4f5e-83ff-46e27470fa9b
+* **Interactive Molecule Builder**: Spawn atoms by symbol or input chemical formulas; auto-generate resonance‑optimized structures via a custom `Resonance::Generator`.
+* **Force-Based Simulation**: Bonds modeled as springs apply real-time forces; atoms move under Verlet-like integration with damping and collision against a bounding box and floor.
+* **VSEPR Geometry Calculations**: Dynamically compute lone‑pair positions and ideal bond angles using energy‑minimization or fast correction methods; display both real and ideal angles on-screen.
+* **Formal Charge & Dipole Analysis**: Calculate formal charges per atom; compute net dipole moment from partial charges (fractional based on electronegativity differences) and show polarity vectors in 3D.
+* **Lone Pair Visualization**: Generate virtual dots for lone pairs using tetrahedral or planar heuristics; update positions in real time as bonds form or break.
+* **Multiple Bond Orders**: Display single, double, and triple bonds with separate cylinders; count and render sigma and pi bonds.
+* **Simulation Stability Indicator**: Monitor VSEPR correction magnitude and show a percentage stability gauge.
+* **Extended Periodic Table**: Look up atomic properties (atomic number, mass, electronegativity, valence) from a built-in table for hover tooltips and calculations.
+* **Custom Particle Engine**: Lightweight engine without external physics libraries; supports fixed atoms and flight mode.
+* **Flying Camera**: Free‑roaming 360° camera with optional auto-follow of molecule center.
+* **Real-Time Interactions**: Create/delete bonds (1–3 order), drag atoms, and remove entire molecule on-the-fly.
+* **Prebuilt Templates**: One‑click generation of common molecules: H₂O, CO₂, NH₃, CH₄, NO₂⁻, HCN, O₃, CN⁻.
+* **Dynamic Lighting & Shaders**: Phong‑style shaders for atoms and bonds; raytracing module available (OpenGL 4.6 required).
+* **ImGui-Based UI**: Tabbed menu for main controls, prebuilt selections, and usage instructions.
 
+## Preview
 
-## V2
-https://github.com/user-attachments/assets/a79641f6-50ad-49c7-9c50-a4042feb9597
+## Controls & UI
 
+### Camera & Interaction
 
-## V3
-https://github.com/user-attachments/assets/a902c38a-9a0e-49d6-9f6f-f58ca07da89e
+* **W/A/S/D**: Move camera in flight mode.
+* **Mouse Look**: Hold right mouse button and move to rotate camera.
+* **TAB**: Toggle between Fly mode and Edit mode.
+* **Left‑drag**: Grab and drag atoms in Edit mode.
 
+### Bond Management
 
+* **Click two atoms + \[1/2/3]**: Create a single, double, or triple bond.
+* **Right‑click two atoms**: Break existing bond.
+* **Delete Molecule**: Clears all atoms and bonds.
 
-## ✨ Features
-- Electron geometry calculations
-- Predicts and dynamically finds bond angles
-- Finds and models lone pairs
-- Uses VSEPR methods to compute geometry
-- Computes dipoles and displays molecule polarity/polarity magnitude
-- Molecule simulations are build on a custom particle engine
-- Extended periodic table for enhanced lookups
-- Loads shaders and creates meshes for full 3D enhancements
-- Floor grid
-- Uses a flying camera for 360 view of any structure
-- Model interations using Valence Electron Shell Repulsion Theory (dynamically computes lone pair positions using VSEPR theory)
-- Easy to use molecule builder (new)
-- Formal charge calculations (new)
-- Real-Time creation, and deletion of bonds (new)
-- Real-Time dragging of molecules (new)
-- Molecules update in real time to client interations (new)
-- Dynamic light shaders (no raytracing) (new)
-- Advanced molecule stability system (new)
-- Relevant atom information on-hover (new)
-- Collision detection for molecule and camera (new)
-- Even more advanced lone-pair position calculations (new)
-- Polarity calculation using partial charges
-- Displays pi and sigma bonds
-- Gives a simulation stability indicator
+### ImGui Menu Tabs
 
-## 📚 Tech Stack
-- **C++17**
-- **OpenGL 3.3+**
-- **GLFW** — Window and input handling
-- **GLAD** — OpenGL function loader
-- **GLM** — Mathematics library for 3D transformations
-- **CMake** — Build system
+* **Main**: Spawn atoms by symbol; input chemical formulas for auto‑resonance; toggle VSEPR correction, stability options, and camera follow.
+* **Prebuilt**: One‑click generation of common molecules (H₂O, CO₂, NH₃, CH₄, NO₂⁻, HCN, O₃, CN⁻).
+* **Instructions**: Keybindings and mouse operations summary.
 
-## 🚀 Getting Started
+Tooltips on hover display per-atom details: element symbol, atomic number, mass, electronegativity, dipole magnitude, lone pairs, bond counts (single/double/triple/sigma/pi).
 
-### Prerequisites
-Make sure you have installed:
-- C++ compiler supporting C++17
-- CMake >= 3.10
-- GLFW
-- GLAD
-- GLM
+## Architecture & Operations
 
-## 🛠️ Planned Features
-- Chemical equation parsing
-- Automatic resonance structure computation
-- Dynamic light shaders with raytracing
-- GUI
-- Expanded octect rules (add nuance into calculations)
-- Attempt to find imperical angles along with model/simulation angles 
+The core of the simulator revolves around two tightly coupled subsystems: **Resonance & Formula Parsing** and the **AtomSystem & Simulation Loop**.
 
-## 🎨 Future Ideas
-- Add a GUI (ImGui) for real-time tweaking
-- Optimizations: spatial partitioning, multithreading
+### Resonance & Formula Parsing
 
-## 📄 License
-This project is licensed under the MIT License. See the LICENSE file for details.
+1. **Formula Tokenization** (`Parser::parseFormula`):
 
-## 👏 Acknowledgements
-LearnOpenGL — Great resource for modern OpenGL
+   * Reads chemical formulas (e.g. `C6H6`, `K4[ON(SO3)2]2`) and expands bracketed groups and multipliers.
+   * Produces a flat list of element symbols and formal charges.
+2. **Resonance Structure Generation** (`Resonance::Generator`):
 
-TheCherno — Fantastic C++ and OpenGL tutorials
+   * Constructs all valid bonding graphs given valence rules and total electron counts.
+   * Evaluates each graph by computing formal charges and selects the structure minimizing total charge deviations.
+   * Returns a vector of `Bond` objects: atom index pairs with bond orders (single/double/triple).
 
-Open-source contributors to GLFW, GLM, and GLAD
+### AtomSystem & Simulation Loop
 
+1. **System Initialization** (`AtomSystem::AtomSystem(size, textRenderer)`):
 
-You can install dependencies via a package manager (like `vcpkg`, `brew`, `apt`) or build them manually.
+   * Allocates storage for atoms and bonds; initializes rendering text overlay.
+2. **Building a Molecule** (`AtomSystem::build(symbols, bonds)`):
 
-### Building the Project
+   * **Spawn Atoms**: Places each atom at the computed center of mass.
+   * **Attach Bonds**: Iterates `bonds` from the resonance generator or manual input; creates spring-like `Bond` instances.
+   * **Initial Layout**: Offsets atom positions radially to avoid overlap, resets velocities.
+3. **Main Loop** (`AtomSystem::updateAll(dt)` + `AtomSystem::renderAll(viewProj)`):
 
-```bash
-git clone https://github.com/yourusername/3D-Particle-Simulator.git
-cd 3D-Particle-Simulator
-mkdir build
-cd build
-cmake ..
-make
-./Molecule Simulator
+   * **Bond Forces** (`Bond::applyForce`): Hooke’s law spring forces between bonded atoms.
+   * **VSEPR Corrections**:
 
+     * **Force-Based** (`applyVSEPRForces`): Applies repulsive forces between electron domains (bonds & lone pairs).
+     * **Fast-Angle** (`applyVSEPRAngleFast`): Directly snaps bond vectors toward ideal angles for tetrahedral, trigonal, etc.
+   * **Integration** (`Atom::update(dt)`): Verlet-like position update with optional gravity, damping, and bounding collisions.
+   * **Property Updates**:
 
+     * Lone-pair positions via heuristics (tetrahedral, trigonal planar).
+     * Formal charge recalculation per atom.
+     * Partial-charge dipole computation: electronegativity-based partial charges aggregated into a net dipole vector.
+   * **Render**:
 
+     * Atoms as lit spheres, bonds as multi-cylinder segments for sigma/π distinctions.
+     * Overlays: bond angles, lone-pair dots, stability gauge, and hover-tooltips.
 
+## Tech Stack
+
+* **Language**: C++17
+* **Graphics**: OpenGL 3.3+ / 4.6
+* **Windowing/Input**: GLFW
+* **OpenGL Loader**: GLAD
+* **Math**: GLM
+* **UI**: ImGui
+* **Build**: CMake >= 3.10
+
+## Prerequisites
+
+Install the following on your system:
+
+* **C++17 compiler** (e.g., GCC 9+, Clang 9+, MSVC 2019+)
+* **CMake** >= 3.10
+* **GLFW**, **GLAD**, **GLM**, **ImGui**
+
+You can install dependencies via package managers:
+
+* **vcpkg**: \$1
+
+## Testing Suite
+
+A comprehensive set of automated tests validates parsing, resonance generation, and the atom system. The test suite is implemented in `Tests.cpp` and uses the built-in test harness to:
+
+* **Parse & Expand**: Verify `Parser::parseFormula` correctly tokenizes formulas with nested groups and charges.
+* **Resonance Validation**: Ensure `Resonance::Generator` produces the lowest-formal-charge structure for cases like NO₃⁻, benzene, and complex ions.
+* **Atom System Checks**: Build molecules with `AtomSystem::build` and confirm correct atom counts and bond orders via lambdas in each `TestCase`.
+
+### Running Tests
+
+1. **Enable Testing in CMake**:
+
+   ```cmake
+   # In CMakeLists.txt
+   enable_testing()
+   add_executable(MoleculeSimulatorTests Tests.cpp Parser.cpp Resonance.cpp AtomSystem.cpp Atom.cpp Bond.cpp main.cpp)
+   target_link_libraries(MoleculeSimulatorTests PRIVATE GTest::GTest GTest::Main)
+   add_test(NAME MolSimTests COMMAND MoleculeSimulatorTests)
+   ```
+2. **Build & Execute**:
+
+   ```bash
+   mkdir build && cd build
+   cmake -DBUILD_TESTS=ON ..
+   make -j$(nproc)
+   ctest --verbose
+   ```
+3. **Interpret Results**:
+
+   * Each test prints the molecule name, expected vs. actual composition or bond count, and PASS/FAIL.
+   * To add new cases, edit `Tests.cpp`, append to the `tests` vector with a lambda validator and expected string.
+
+Ensure `glfw`, `glad`, and `glm` headers are accessible to the test target for linking and compilation.
+
+* To enable GPU raytracing (requires OpenGL 4.6), edit `main.cpp` and set `useRT = true`.
+
+## Planned Features
+
+* **Chemical Equation Parsing**: Support multi-component reactions and stoichiometry.
+* **Automatic Resonance Structures**: Display all equivalent resonance forms.
+* **Expanding Octet Rules**: Nuanced handling for period‑3+ elements.
+* **GUI Panels**: ImGui windows for per-atom and per-bond property sliders.
+* **Dynamic Raytraced Lighting**: Real-time raytracing integration.
+
+## Future Ideas
+
+* **Spatial Partitioning**: Octree/K‑d tree for performance on large molecules.
+* **Multithreading**: Offload physics or rendering tasks to worker threads.
+* **Scripting Interface**: Python or Lua API for automated workflows.
+* **File I/O**: Import/export common formats (XYZ, PDB, MOL).
+* **Advanced Hamiltonian Simulation**: Hook up semi-empirical quantum engines.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgements
+
+* **LearnOpenGL**: Comprehensive OpenGL tutorials.
+* **TheCherno**: In-depth C++ and graphics programming series.
+* **GLFW**, **GLAD**, **GLM**, **ImGui**: Open-source graphics libraries and UI framework.
