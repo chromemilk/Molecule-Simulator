@@ -59,6 +59,8 @@ public:
 
     bool fastCorrection = false;
 
+    bool applyVESPR = false;
+
     const std::vector<Atom> &getAtoms() const {
         return atoms;
     }

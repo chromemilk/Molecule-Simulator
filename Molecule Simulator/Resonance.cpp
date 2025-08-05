@@ -400,7 +400,7 @@ namespace Resonance
 
 
         auto fcSum = [&]( const std::vector<Bond> &mol ) {
-            return formalCharge( mol );                  // one call is enough
+            return formalCharge( mol );              // one call, no loop
             };
 
         int bestFC = std::numeric_limits<int>::max();

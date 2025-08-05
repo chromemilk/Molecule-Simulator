@@ -80,6 +80,7 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
             ImGui::Checkbox( "Energy-minimization VSEPR (better for more complex molecules)", &atoms.fastCorrection );
             ImGui::Checkbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
+			ImGui::Checkbox( "Apply VSEPR", &atoms.applyVESPR );
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();

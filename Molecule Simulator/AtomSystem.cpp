@@ -25,18 +25,21 @@ void AtomSystem::update( float dt ) {
         b.applyForce();
     }
 
-    if (fastCorrection)
+    if (applyVESPR == true)
     {
-		applyVSEPRAngleFast( dt );
-    }
-    else
-    {
-        applyVSEPRForces( dt );
+        if (fastCorrection)
+        {
+            applyVSEPRAngleFast( dt );
+        }
+        else
+        {
+            applyVSEPRForces( dt );
+        }
     }
     
     if (betterStabilization)
     {
-        const float drag = 0.98f;   
+        const float drag = 0.95f;   
         for (Atom &a : atoms)
         {
             a.velocity *= drag;
