@@ -107,8 +107,8 @@ namespace Resonance
         }
     }
 
- 
-    Generator::Generator( const vector<string> &atoms ) {
+
+    Generator::Generator( const vector<string> &atoms, int nc ) : targetCharge(nc) {
         const int n = atoms.size();
         new2old.reserve( n );   symbols.reserve( n );
 
@@ -146,8 +146,34 @@ namespace Resonance
         }
     }
 
+    int Generator::netCharge( const std::vector<Bond> &bonds ) const {
+        const int n = symbols.size();
+        std::vector<int> bondSum( n, 0 );
+        for (auto [i, j, o] : bonds)
+        {
+            bondSum[ i ] += o;  bondSum[ j ] += o;
+        }
+
+        const auto &pt = PeriodicTable::Instance();
+        int q = 0;
+
+        for (int i = 0; i < n; ++i)
+        {
+            std::string base = stripCharge( symbols[ i ] );
+            int desired = (base == "H") ? 2 : (pt.Get( base ).atomicNumber > 10 ? 12 : 8);
+
+            int ve = pt.Get( base ).valenceElectrons;
+            int bondsOwn = bondSum[ i ];
+            int loneE = std::max( 0, desired - 2 * bondSum[ i ] );
+
+            q += ve - (bondsOwn + loneE);          // signed FC this time
+        }
+        return q;                                  // algebraic ?FC  (= total charge)
+    }
+
+
     vector<Bond> Generator::attachHydrogens( vector<uint8_t> &valLeft ) {
-        const int totalH = static_cast<int>( symbols.size() ) - heavyCnt;
+        const int totalH = static_cast<int>(symbols.size()) - heavyCnt;
         int        hIndex = heavyCnt;               // first H in reordered list
         int        hLeft = totalH;
 
@@ -200,29 +226,33 @@ namespace Resonance
         return out;
     }
 
-    int Generator::formalCharge( const vector<Bond> &bonds ) const {
+    int Generator::formalCharge( const std::vector<Bond> &bonds ) const {
         const int n = symbols.size();
-        vector<int> bondSum( n, 0 );
+        std::vector<int> bondSum( n, 0 );          // ? bond orders around each atom
         for (auto [i, j, o] : bonds)
         {
-            bondSum[ i ] += o; bondSum[ j ] += o;
+            bondSum[ i ] += o;  bondSum[ j ] += o;
         }
 
-        auto &pt = PeriodicTable::Instance();
+        const auto &pt = PeriodicTable::Instance();
         int total = 0;
+
         for (int i = 0; i < n; ++i)
         {
-            string base = stripCharge( symbols[ i ] );
-            int desired = (base == "H") ? 2 : 8;
-            if (pt.Get( base ).atomicNumber > 10) desired = 12; // hypervalent allowed
+            std::string base = stripCharge( symbols[ i ] );
+            int desired = (base == "H") ? 2 : (pt.Get( base ).atomicNumber > 10 ? 12 : 8);
 
-            int bondingE = bondSum[ i ] * 2;
-            int loneE = std::max( 0, desired - bondingE );
-            int fc = pt.Get( base ).valenceElectrons - (bondSum[ i ] + loneE / 2 * 2);
+            int ve = pt.Get( base ).valenceElectrons;          // valence electrons
+            int bondsOwn = bondSum[ i ];                             // B/2  (one e- per bond)
+            int loneE = std::max( 0, desired - 2 * bondSum[ i ] );  // L    (electrons in lone pairs)
+
+            int fc = ve - (bondsOwn + loneE);      // signed formal charge
             total += std::abs( fc );
         }
-        return total;
+        return total;                              // ?|FC|
     }
+
+
     void Generator::dfs( int next,
         std::vector<std::uint8_t> &valLeft,
         std::vector<Bond> &current,
@@ -284,7 +314,7 @@ namespace Resonance
             if (symbols.size() % 2 == 0)
             {
                 vector<Bond> hb;
-                for (int i = 0; i < static_cast<int>(symbols.size()); i += 2)
+                for (int i = 0; i < static_cast<int>( symbols.size() ); i += 2)
                     hb.emplace_back( i, i + 1, 1 );
                 all.push_back( std::move( hb ) );
             }
@@ -332,40 +362,91 @@ namespace Resonance
         return (int)bs.size();
     }
 
+
+    bool Generator::hypervalent( const std::vector<Bond> &mol ) const {
+        std::vector<int> bondSum( symbols.size(), 0 );
+        for (auto [i, j, o] : mol)
+        {
+            bondSum[ i ] += o; bondSum[ j ] += o;
+        }
+
+        const auto &pt = PeriodicTable::Instance();
+        for (std::size_t k = 0; k < symbols.size(); ++k)
+        {
+            int Z = pt.Get( symbols[ k ] ).atomicNumber;
+            if (Z <= 10 && bondSum[ k ] > 4)       // B–Ne may not exceed octet
+                return true;
+        }
+        return false;
+    }
+
     std::vector<Bond> Generator::bestStructure() {
-        auto candidates = generateStructures();
-        if (candidates.empty())
-            throw std::runtime_error( "No valid resonance structures found" );
+ 
+        const auto all = generateStructures();        
+        if (all.empty())
+            throw std::runtime_error( "No resonance structures generated" );
 
-        int minFC = std::numeric_limits<int>::max();
-        for (auto &m : candidates)
-            minFC = std::min( minFC, formalCharge( m ) );
 
-        std::vector<std::vector<Bond>> filtered;
-        for (auto &m : candidates)
-            if (formalCharge( m ) == minFC)
-                filtered.push_back( m );
+        std::vector<const std::vector<Bond> *> legal;
+        for (const auto &m : all)
+            if (netCharge( m ) == targetCharge      /* exact charge     */
+                && !hypervalent( m ))                 /* octet preserved  */
+                legal.push_back( &m );
 
-        auto score = []( const std::vector<Bond> &mol ) {
-            int dbl = 0, tri = 0, sum = 0;
-            for (auto [i, j, o] : mol)
-            {
-                if (o == 2) ++dbl;
-                if (o == 3) ++tri;
-                sum += o;
-            }
-            return std::tuple{ dbl, -tri, sum };   // higher tuple is better
+        if (legal.empty())
+            throw std::runtime_error(
+                "No structure matches the required charge "
+                "without exceeding the octet on 2nd-row atoms" );
+
+
+        auto fcSum = [&]( const std::vector<Bond> &mol ) {
+            return formalCharge( mol );                  // one call is enough
             };
 
-        auto bestIt = std::max_element(
-            filtered.begin(), filtered.end(),
-            [&]( const auto &a, const auto &b ) { return score( a ) < score( b ); } );
+        int bestFC = std::numeric_limits<int>::max();
+        for (auto m : legal) bestFC = std::min( bestFC, fcSum( *m ) );
 
-        std::vector<Bond> result;
-        for (auto [i, j, o] : *bestIt)
-            result.emplace_back( new2old[ i ], new2old[ j ], o );
+        std::vector<const std::vector<Bond> *> fcFiltered;
+        for (auto m : legal)
+            if (fcSum( *m ) == bestFC) fcFiltered.push_back( m );
 
-        return result;
+    
+        auto score = [&]( const std::vector<Bond> &mol )
+            {
+                int dbl = 0, tri = 0, sum = 0;
+                for (auto [i, j, o] : mol)
+                {
+                    if (o == 2) ++dbl;
+                    if (o == 3) ++tri;
+                    sum += o;
+                }
+
+                std::vector<int> bondCnt( symbols.size(), 0 );
+                for (auto [i, j, o] : mol)
+                {
+                    bondCnt[ i ] += o; bondCnt[ j ] += o;
+                }
+
+                int typDev = 0;
+                for (std::size_t i = 0; i < symbols.size(); ++i)
+                    typDev += std::abs( bondCnt[ i ] - typicalValence( symbols[ i ] ) );
+
+                int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
+                int conn = static_cast<int>( mol.size() );
+
+                /* smaller tuple = better */
+                return std::tuple{ dbl, -typDev, -over, conn, -tri, sum };
+            };
+
+        const auto *best = *std::min_element( fcFiltered.begin(), fcFiltered.end(),
+            [&]( auto a, auto b ) { return score( *a ) < score( *b ); } );
+
+   
+        std::vector<Bond> out;
+        for (auto [i, j, o] : *best)
+            out.emplace_back( new2old[ i ], new2old[ j ], o );
+
+        return out;
     }
 
 } // namespace Resonance

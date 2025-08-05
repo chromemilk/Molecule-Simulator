@@ -18,98 +18,96 @@
 #include "Resonance.h"
 
 void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &textRenderer ) {
-	int passes = 0, fails = 0;
+    int passes = 0, fails = 0;
 
     struct TestCase
     {
-        std::string name;
-        std::string formula;
-        std::function<bool( const AtomSystem & )> validate;
-        std::string expected;
+        std::string                             name;
+        std::string                             formula;
+        std::function<bool( const AtomSystem & )>  validate;
+        std::string                             expected;
     };
 
-    std::cout << "Init Unit Tests For System: RESONANCE" << std::endl;
+    std::cout << "Init Unit Tests For System: RESONANCE\n"
+        << "-------------------------------------\n";
 
     const std::vector<TestCase> tests{
-        {"Methanol (CH3OH)", "CH3OH",   
-         []( const AtomSystem &sys )
-         {
-             const auto &bonds = sys.getBonds();
-             if (bonds.size() != 5) return false;
-             for (const auto &b : bonds)
-                 if (b.type != BondType::SINGLE) return false;
-             return true;
-         },
-         "5 single bonds"},
+        {"Methanol (CH3OH)", "CH3OH",
+            []( const AtomSystem &sys )
+            {
+                if (sys.getBonds().size() != 5) return false;
+                for (auto &b : sys.getBonds())
+                    if (b.type != BondType::SINGLE) return false;
+                return true;
+            },
+            "5 single bonds"},
 
         {"Nitrate Ion (NO3-)", "NO3-",
-         []( const AtomSystem &sys )
-         {
-             int dbl = 0, sing = 0;
-             for (const auto &b : sys.getBonds())
-             {
-                 if (b.type == BondType::DOUBLE) ++dbl;
-                 if (b.type == BondType::SINGLE) ++sing;
-             }
-             return dbl == 1 && sing == 2;
-         },
-         "1 double & 2 single bonds"},
+            []( const AtomSystem &sys )
+            {
+                int dbl = 0, sing = 0;
+                for (auto &b : sys.getBonds())
+ {
+if (b.type == BondType::DOUBLE) ++dbl;
+if (b.type == BondType::SINGLE) ++sing;
+}
+return dbl == 1 && sing == 2;
+},
+"1 double & 2 single bonds"},
 
-        {"Carbon Dioxide (CO2)", "CO2",
-         []( const AtomSystem &sys )
-         {
-             int dbl = 0;
-             for (const auto &b : sys.getBonds())
-                 if (b.type == BondType::DOUBLE) ++dbl;
-             return dbl == 2;
-         },
-         "2 double bonds"},
+{"Carbon Dioxide (CO2)", "CO2",
+    []( const AtomSystem &sys )
+    {
+        int dbl = 0;
+        for (auto &b : sys.getBonds())
+            if (b.type == BondType::DOUBLE) ++dbl;
+        return dbl == 2;
+    },
+    "2 double bonds"},
 
-        {"Ozone (O3)", "O3",
-         []( const AtomSystem &sys )
-         {
-             int dbl = 0, sing = 0;
-             for (const auto &b : sys.getBonds())
-             {
-                 if (b.type == BondType::DOUBLE) ++dbl;
-                 if (b.type == BondType::SINGLE) ++sing;
-             }
-             return dbl == 1 && sing == 1;
-         },
-         "1 double & 1 single bond"},
+{"Ozone (O3)", "O3",
+    []( const AtomSystem &sys )
+    {
+        int dbl = 0, sing = 0;
+        for (auto &b : sys.getBonds())
+{
+if (b.type == BondType::DOUBLE) ++dbl;
+if (b.type == BondType::SINGLE) ++sing;
+}
+return dbl == 1 && sing == 1;
+},
+"1 double & 1 single bond"},
 
-        {"Cyanide Ion (CN-)", "CN-",
-         []( const AtomSystem &sys )
-         {
-             const auto &bonds = sys.getBonds();
-             return bonds.size() == 1 && bonds[ 0 ].type == BondType::TRIPLE;
-         },
-         "1 triple bond"},
-		// C6H6 is a special case with resonance structures, fix this
-        {"Benzene (C6H6)", "C6H6",
-         []( const AtomSystem &sys )
-         {
-             int dbl = 0, sing = 0;
-             for (const auto &b : sys.getBonds())
-             {
-                 if (b.type == BondType::DOUBLE) ++dbl;
-                 if (b.type == BondType::SINGLE) ++sing;
-             }
-             return dbl == 3 && sing == 9;
-         },
-         "3 double & 9 single bonds"},
+{"Cyanide Ion (CN-)", "CN-",
+    []( const AtomSystem &sys )
+    {
+        const auto &bonds = sys.getBonds();
+        return bonds.size() == 1 && bonds[ 0 ].type == BondType::TRIPLE;
+    },
+    "1 triple bond"},
 
-        {"Sulfur Hexafluoride (SF6)", "SF6",
-         []( const AtomSystem &sys )
-         {
-             int cnt = 0;
-             for (const auto &b : sys.getBonds())
-             {
-                 if (b.atomA->type == "S" || b.atomB->type == "S") ++cnt;
-             }
-             return cnt == 6;
-         },
-         "6 S-F bonds"},
+{"Benzene (C6H6)", "C6H6",
+    []( const AtomSystem &sys )
+    {
+        int dbl = 0, sing = 0;
+        for (auto &b : sys.getBonds())
+{
+if (b.type == BondType::DOUBLE) ++dbl;
+if (b.type == BondType::SINGLE) ++sing;
+}
+return dbl == 3 && sing == 9;
+},
+"3 double & 9 single bonds"},
+
+{"Sulfur Hexafluoride (SF6)", "SF6",
+    []( const AtomSystem &sys )
+    {
+        int cnt = 0;
+        for (auto &b : sys.getBonds())
+            if (b.atomA->type == "S" || b.atomB->type == "S") ++cnt;
+        return cnt == 6;
+    },
+    "6 S-F bonds"},
     };
 
     for (const auto &test : tests)
@@ -117,43 +115,47 @@ void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &t
         std::cout << "---- " << test.name << " ----\n";
         std::cout << "Input: " << test.formula << '\n';
 
-        const auto syms = parseFormula( test.formula );
-        Resonance::Generator gen( syms );
-        const auto bonds = gen.bestStructure();
+        bool   pass = false;
+        std::string  actual = "RUNTIME EXCEPTION";
 
-        AtomSystem sys( 100, textRenderer );
-        sys.build( syms, bonds );
-
-        const bool pass = test.validate( sys );
-        std::cout << "Expected: " << test.expected << '\n';
-
-        std::string actual;
-        if (test.expected.find( "composition" ) != std::string::npos)
+        try
         {
-            std::map<std::string, int> cnt;
-            for (const auto &a : sys.getAtoms()) ++cnt[ a.type ];
-            for (const auto &p : cnt)
-                actual += p.first + ':' + std::to_string( p.second ) + ' ';
-        }
-        else
-        {
+            ParsedFormula pf = parseFormulaFull( test.formula );
+
+            Resonance::Generator gen( pf.atoms, pf.charge );
+            const auto bonds = gen.bestStructure();
+
+            AtomSystem sys( 100, textRenderer );
+            sys.build( pf.atoms, bonds );
+
+            pass = test.validate( sys );
+
             int singles = 0, doubles = 0, triples = 0;
-            for (const auto &b : sys.getBonds())
+            for (auto &b : sys.getBonds())
             {
-                if (b.type == BondType::SINGLE) ++singles;
-                if (b.type == BondType::DOUBLE) ++doubles;
-                if (b.type == BondType::TRIPLE) ++triples;
+                if (b.type == BondType::SINGLE)  ++singles;
+                if (b.type == BondType::DOUBLE)  ++doubles;
+                if (b.type == BondType::TRIPLE)  ++triples;
             }
             actual = std::to_string( doubles ) + " double, " +
                 std::to_string( singles ) + " single, " +
                 std::to_string( triples ) + " triple bonds";
         }
-        if (pass) passes++;
-		else fails++;
-        std::cout << "Actual: " << actual << '\n';
-        std::cout << "Result: " << (pass ? "PASS" : "FAIL") << "\n\n";
+        catch (const std::exception &e)
+        {
+            std::cout << "Exception: " << e.what() << '\n';
+        }
+
+        std::cout << "Expected: " << test.expected << '\n'
+            << "Actual:   " << actual << '\n'
+            << "Result:   " << (pass ? "PASS" : "FAIL") << "\n\n";
+
+        (pass ? ++passes : ++fails);
     }
+
+    double ratio = passes + fails ? 100.0 * passes / (passes + fails) : 0.0;
     std::cout << "Pass Ratio: " << std::fixed << std::setprecision( 2 )
-		<< (100.0f * passes / (passes + fails)) << "%\n";
-    
+        << ratio << "%\n"
+        << "-------------------------------------\n"
+        << "Verdict: " << (ratio > 85.0 ? "PASS" : "FAIL") << std::endl;
 }

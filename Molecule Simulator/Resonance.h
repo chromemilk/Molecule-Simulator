@@ -15,7 +15,7 @@ namespace Resonance {
     class Generator {
     public:
 
-        explicit Generator(const std::vector<std::string>& atoms);
+        explicit Generator(const std::vector<std::string>& atoms, int netCharge = 0);
 
 
         std::vector<int> new2old;   
@@ -23,11 +23,14 @@ namespace Resonance {
 
 
         std::vector<std::vector<Bond>> generateStructures();
-        std::vector<Bond>              bestStructure();
+        std::vector<Bond>  bestStructure();
+        bool hypervalent( const std::vector<Bond> & ) const;
 
     private:
         std::vector<std::string> symbols;   // heavy atoms first, hydrogens last
-        int                      heavyCnt{ 0 };
+        int heavyCnt{ 0 };
+        int targetCharge = 0;
+        int netCharge( const std::vector<Bond> & ) const;
 
         static uint8_t typicalValence(std::string sym);
 

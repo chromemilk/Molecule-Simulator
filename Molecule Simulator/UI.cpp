@@ -58,12 +58,16 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::InputText( "Formula", formula, sizeof( formula ) );
             if (ImGui::Button( "Generate (automatic resonance)" ) && formula[ 0 ])
             {
-                auto elems = parseFormula( formula );
-                Resonance::Generator gen( elems );
-                atoms.build( elems, gen.bestStructure() );
+                ParsedFormula pf = parseFormulaFull( formula );      
+
+                Resonance::Generator gen( pf.atoms, pf.charge );
+
+                atoms.build( pf.atoms, gen.bestStructure() );        
+
                 ctx.currentPrebuiltAtom = formula;
                 formula[ 0 ] = '\0';
             }
+
 
             ImGui::Separator();
             if (ImGui::Button( "Delete Molecule" ))
