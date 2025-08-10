@@ -250,7 +250,6 @@ namespace Resonance
         return total;                              // ?|FC|
     }
 
-
     void Generator::dfs( int next,
         std::vector<std::uint8_t> &valLeft,
         std::vector<Bond> &current,
@@ -261,9 +260,7 @@ namespace Resonance
             int fc = formalCharge( current );
             if (fc < bestCharge)
             {
-                bestCharge = fc;
-                bag.clear();
-                bag.push_back( current );
+                bestCharge = fc; bag.clear(); bag.push_back( current );
             }
             else if (fc == bestCharge)
             {
@@ -277,30 +274,46 @@ namespace Resonance
             return (already + extra) > maxValenceFor( symbols[ atom ] );
             };
 
-        for (int prev = 0; prev < next; ++prev)
-        {
-            if (centralOnlyBonding && heavyCnt > 2 && prev != 0 && next != 0)
-                continue;
-
-            int maxOrder = std::min<int>( 3, std::min( valLeft[ prev ], valLeft[ next ] ) );
-
-            while (maxOrder >= 1 &&
-                (exceedsLimit( prev, maxOrder ) || exceedsLimit( next, maxOrder )))
-                --maxOrder;
-
-            for (int o = maxOrder; o >= 1; --o)
+        // Decide bonds from `next` to ALL previous heavy atoms
+        std::function<void( int )> linkPrev = [&]( int prev )
             {
-                valLeft[ prev ] -= o;  valLeft[ next ] -= o;
-                current.emplace_back( prev, next, o );
+                if (prev == next)
+                {
+                    // done wiring `next`; move on
+                    dfs( next + 1, valLeft, current, bestCharge, bag );
+                    return;
+                }
 
-                dfs( next + 1, valLeft, current, bestCharge, bag );
+                if (centralOnlyBonding && heavyCnt > 2 && prev != 0 && next != 0)
+                {
+                    linkPrev( prev + 1 );         // skip if using “central only” mode
+                    return;
+                }
 
-                current.pop_back();
-                valLeft[ prev ] += o;  valLeft[ next ] += o;
-            }
-        }
+                int maxOrder = std::min<int>( 3, std::min( valLeft[ prev ], valLeft[ next ] ) );
+                while (maxOrder >= 1 && (exceedsLimit( prev, maxOrder ) || exceedsLimit( next, maxOrder )))
+                    --maxOrder;
 
-        dfs( next + 1, valLeft, current, bestCharge, bag );
+                // Try all possibilities, including 0 (no bond to this prev)
+                for (int o = maxOrder; o >= 0; --o)
+                {
+                    if (o > 0)
+                    {
+                        valLeft[ prev ] -= o;  valLeft[ next ] -= o;
+                        current.emplace_back( prev, next, o );
+                    }
+
+                    linkPrev( prev + 1 );
+
+                    if (o > 0)
+                    {
+                        current.pop_back();
+                        valLeft[ prev ] += o;  valLeft[ next ] += o;
+                    }
+                }
+            };
+
+        linkPrev( 0 );
     }
 
 
@@ -399,41 +412,94 @@ namespace Resonance
 
         auto fcSum = [&]( const std::vector<Bond> &mol ) {
             return formalCharge( mol );              // one call, no loop
-            };
+        };
 
-        int bestFC = std::numeric_limits<int>::max();
-        for (auto m : legal) bestFC = std::min( bestFC, fcSum( *m ) );
+        auto fcDelta = [&]( const std::vector<Bond> &mol ) {
+            return std::abs( formalCharge( mol ) - targetCharge );
+        };
+
+        int bestDelta = std::numeric_limits<int>::max();
+        for (auto m : legal) bestDelta = std::min( bestDelta, fcDelta( *m ) );
 
         std::vector<const std::vector<Bond> *> fcFiltered;
         for (auto m : legal)
-            if (fcSum( *m ) == bestFC) fcFiltered.push_back( m );
+            if (fcDelta( *m ) == bestDelta) fcFiltered.push_back( m );
 
-    
+
         auto score = [&]( const std::vector<Bond> &mol )
             {
-                int dbl = 0, tri = 0, sum = 0;
+                int dbl = 0, tri = 0, sum = 0, over = 0;
+                std::vector<int> bondCnt( symbols.size(), 0 );
+
+                int heavyEdges = 0;
+                std::vector<std::vector<int>> adj( heavyCnt );
+
                 for (auto [i, j, o] : mol)
                 {
                     if (o == 2) ++dbl;
                     if (o == 3) ++tri;
                     sum += o;
-                }
+                    over += (o - 1) * (o - 1);
 
-                std::vector<int> bondCnt( symbols.size(), 0 );
-                for (auto [i, j, o] : mol)
-                {
                     bondCnt[ i ] += o; bondCnt[ j ] += o;
+
+                    if (i < heavyCnt && j < heavyCnt)
+                    {
+                        ++heavyEdges;
+                        adj[ i ].push_back( j );
+                        adj[ j ].push_back( i );
+                    }
                 }
 
+                // Sum of |actual valence - typical valence|
                 int typDev = 0;
-                for (std::size_t i = 0; i < symbols.size(); ++i)
-                    typDev += std::abs( bondCnt[ i ] - typicalValence( symbols[ i ] ) );
+                for (std::size_t k = 0; k < symbols.size(); ++k)
+                    typDev += std::abs( bondCnt[ k ] - typicalValence( symbols[ k ] ) );
 
-                int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
-                int conn = static_cast<int>( mol.size() );
+                // Connected components among heavy atoms
+                int comps = 0;
+                std::vector<char> seen( heavyCnt, 0 );
+                for (int v = 0; v < heavyCnt; ++v) if (!seen[ v ])
+                {
+                    ++comps;
+                    std::vector<int> st = { v }; seen[ v ] = 1;
+                    while (!st.empty())
+                    {
+                        int u = st.back(); st.pop_back();
+                        for (int w : adj[ u ]) if (!seen[ w ])
+                        {
+                            seen[ w ] = 1; st.push_back( w );
+                        }
+                    }
+                }
 
-                /* smaller tuple = better */
-                return std::tuple{ dbl, -typDev, -over, conn, -tri, sum };
+                // Cyclomatic number = E - V + comps   (heavy subgraph only)
+                int cycl = heavyEdges - heavyCnt + comps;
+                if (cycl < 0) cycl = 0;
+
+                // Allow exactly one cycle for neutral, all-carbon C6H6 (aromatic case)
+                int hCount = static_cast<int>( symbols.size() ) - heavyCnt;
+                bool aromaticC6 =
+                    (targetCharge == 0) &&
+                    (heavyCnt == 6) &&
+                    (hCount == 6) &&
+                    std::all_of( symbols.begin(), symbols.begin() + heavyCnt,
+                        []( const std::string &s ) { return s == "C"; } );
+
+                int allowedCycles = aromaticC6 ? 1 : 0;
+                int cyclePenalty = std::max( 0, cycl - allowedCycles );
+
+                int conn = static_cast<int>(mol.size());
+
+                // smaller tuple = better
+                return std::tuple{
+                    comps,          // connected heavy graph
+                    typDev,         // near-typical valences
+                    cyclePenalty,   // avoid bogus cycles (except benzene)
+                    over,           // minimize multiple-bond "over"
+                    tri,            // fewer triples
+                    conn            // avoid gratuitous extra bonds
+                };
             };
 
         const auto *best = *std::min_element( fcFiltered.begin(), fcFiltered.end(),

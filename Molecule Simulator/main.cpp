@@ -23,7 +23,6 @@
 static Raytracer ray;          
 static bool useRT = false; // Dont use this 
 
-//--------------------------------------------------
 int main() {
     if (!glfwInit())
     {

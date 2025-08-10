@@ -96,7 +96,7 @@ void Camera::FollowTargetEuler( const glm::vec3 &target, float deltaTime, float 
     Yaw += deltaYaw * t;
     Pitch += deltaPitch * t;
 
-    Pitch = glm::clamp( Pitch, -89.0f, +89.0f );
+    Pitch = glm::clamp( Pitch, -89.0f, 89.0f );
 
     updateCameraVectors();
 }
