@@ -421,28 +421,33 @@ namespace Resonance
         int bestDelta = std::numeric_limits<int>::max();
         for (auto m : legal) bestDelta = std::min( bestDelta, fcDelta( *m ) );
 
-        std::vector<const std::vector<Bond> *> fcFiltered;
-        for (auto m : legal)
-            if (fcDelta( *m ) == bestDelta) fcFiltered.push_back( m );
-
-
+      
         auto score = [&]( const std::vector<Bond> &mol )
             {
-                int dbl = 0, tri = 0, sum = 0, over = 0;
-                std::vector<int> bondCnt( symbols.size(), 0 );
-
-                int heavyEdges = 0;
-                std::vector<std::vector<int>> adj( heavyCnt );
-
+                // --- basic bond stats ---
+                int dbl = 0, tri = 0, sum = 0;
+                std::vector<int> bondSum( symbols.size(), 0 );
                 for (auto [i, j, o] : mol)
                 {
                     if (o == 2) ++dbl;
                     if (o == 3) ++tri;
                     sum += o;
-                    over += (o - 1) * (o - 1);
+                    bondSum[ i ] += o; bondSum[ j ] += o;
+                }
 
-                    bondCnt[ i ] += o; bondCnt[ j ] += o;
+                // typical-valence deviation
+                int typDev = 0;
+                for (std::size_t k = 0; k < symbols.size(); ++k)
+                    typDev += std::abs( bondSum[ k ] - typicalValence( symbols[ k ] ) );
 
+                // multiple-bond penalty (triples weigh more automatically)
+                int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
+
+                // --- heavy subgraph ---
+                std::vector<std::vector<int>> adj( heavyCnt );
+                int heavyEdges = 0;
+                for (auto [i, j, o] : mol)
+                {
                     if (i < heavyCnt && j < heavyCnt)
                     {
                         ++heavyEdges;
@@ -451,12 +456,7 @@ namespace Resonance
                     }
                 }
 
-                // Sum of |actual valence - typical valence|
-                int typDev = 0;
-                for (std::size_t k = 0; k < symbols.size(); ++k)
-                    typDev += std::abs( bondCnt[ k ] - typicalValence( symbols[ k ] ) );
-
-                // Connected components among heavy atoms
+                // connected components among heavy atoms
                 int comps = 0;
                 std::vector<char> seen( heavyCnt, 0 );
                 for (int v = 0; v < heavyCnt; ++v) if (!seen[ v ])
@@ -473,43 +473,124 @@ namespace Resonance
                     }
                 }
 
-                // Cyclomatic number = E - V + comps   (heavy subgraph only)
-                int cycl = heavyEdges - heavyCnt + comps;
-                if (cycl < 0) cycl = 0;
+                // cyclomatic number on heavy subgraph
+                int cycl = std::max( 0, heavyEdges - heavyCnt + comps );
 
-                // Allow exactly one cycle for neutral, all-carbon C6H6 (aromatic case)
-                int hCount = static_cast<int>( symbols.size() ) - heavyCnt;
-                bool aromaticC6 =
-                    (targetCharge == 0) &&
-                    (heavyCnt == 6) &&
-                    (hCount == 6) &&
-                    std::all_of( symbols.begin(), symbols.begin() + heavyCnt,
-                        []( const std::string &s ) { return s == "C"; } );
+       
+                std::unordered_map<long long, int> edgeOrder;
+                auto key = []( int a, int b )->long long { if (a > b) std::swap( a, b ); return ((long long)a << 32) | b; };
+                for (auto [i, j, o] : mol) if (i < heavyCnt && j < heavyCnt) edgeOrder[ key( i, j ) ] = o;
 
-                int allowedCycles = aromaticC6 ? 1 : 0;
-                int cyclePenalty = std::max( 0, cycl - allowedCycles );
+                // desired electron count (octet/expanded) for estimating available lone pairs
+                auto &pt = PeriodicTable::Instance();
+                auto desiredE = [&]( int idx ) {
+                    std::string base = stripCharge( symbols[ idx ] );
+                    int Z = pt.Get( base ).atomicNumber;
+                    return (base == "H") ? 2 : (Z > 10 ? 12 : 8);
+                    };
 
-                int conn = static_cast<int>(mol.size());
+                std::vector<int> loneE( symbols.size(), 0 );
+                for (int i = 0; i < (int)symbols.size(); ++i)
+                    loneE[ i ] = std::max( 0, desiredE( i ) - 2 * bondSum[ i ] );
 
-                // smaller tuple = better
+                auto isHetero = [&]( int a ) {
+                    const std::string s = stripCharge( symbols[ a ] );
+                    return (s == "N" || s == "O" || s == "S" || s == "P");
+                    };
+
+                std::vector<int> compId( heavyCnt, -1 );
+                int compCount = 0;
+                for (int v = 0; v < heavyCnt; ++v) if (compId[ v ] < 0)
+                {
+                    std::vector<int> st = { v }; compId[ v ] = compCount;
+                    while (!st.empty())
+                    {
+                        int u = st.back(); st.pop_back();
+                        for (int w : adj[ u ]) if (compId[ w ] < 0)
+                        {
+                            compId[ w ] = compCount; st.push_back( w );
+                        }
+                    }
+                    ++compCount;
+                }
+
+                int aromaticAllowed = 0;
+                for (int c = 0; c < compCount; ++c)
+                {
+                    std::vector<int> verts;
+                    for (int v = 0; v < heavyCnt; ++v) if (compId[ v ] == c) verts.push_back( v );
+                    if (verts.empty()) continue;
+
+                    int Ecomp = 0; bool allDeg2 = true;
+                    for (int v : verts)
+                    {
+                        int deg = 0;
+                        for (int w : adj[ v ]) if (compId[ w ] == c) ++deg;
+                        allDeg2 &= (deg == 2);
+                        Ecomp += deg;
+                    }
+                    Ecomp /= 2;
+                    if (!(allDeg2 && (Ecomp == (int)verts.size()))) continue;
+
+                    int pi = 0, dblEdges = 0;
+
+                    for (int u : verts) for (int w : adj[ u ]) if (compId[ w ] == c && u < w)
+                    {
+                        int o = edgeOrder[ key( u, w ) ];
+                        if (o >= 2)
+                        {
+                            pi += 2; ++dblEdges;
+                        }
+                    }
+
+                    for (int u : verts)
+                    {
+                        bool hasRingDouble = false;
+                        for (int w : adj[ u ]) if (compId[ w ] == c)
+                        {
+                            if (edgeOrder[ key( u, w ) ] >= 2)
+                            {
+                                hasRingDouble = true; break;
+                            }
+                        }
+                        if (!hasRingDouble && isHetero( u ) && loneE[ u ] >= 2)
+                            pi += 2; // donate ONE lone pair
+                    }
+
+                    if (dblEdges == 0) continue;
+
+                    // Hückel 4n+2
+                    if (pi >= 2 && ((pi - 2) % 4 == 0))
+                        ++aromaticAllowed;
+                }
+
+                int cyclePenalty = std::max( 0, cycl - aromaticAllowed );
+
+                int conn = (int)mol.size();
+
+                int absFC = formalCharge( mol );
+
                 return std::tuple{
                     comps,          // connected heavy graph
+                    cyclePenalty,   // penalize non-aromatic cycles
+                    absFC,          // minimize total |formal charge|
                     typDev,         // near-typical valences
-                    cyclePenalty,   // avoid bogus cycles (except benzene)
-                    over,           // minimize multiple-bond "over"
+                    over,           // avoid unnecessary multiple bonds
                     tri,            // fewer triples
-                    conn            // avoid gratuitous extra bonds
+                    -heavyEdges,    // encourage justified heavy connectivity
+                    conn            // avoid gratuitous extra edges
                 };
             };
 
-        const auto *best = *std::min_element( fcFiltered.begin(), fcFiltered.end(),
-            [&]( auto a, auto b ) { return score( *a ) < score( *b ); } );
 
-   
+        const auto *best = *std::min_element(
+            legal.begin(), legal.end(),
+            [&]( auto a, auto b ) { return score( *a ) < score( *b ); }
+        );
+
         std::vector<Bond> out;
         for (auto [i, j, o] : *best)
             out.emplace_back( new2old[ i ], new2old[ j ], o );
-
         return out;
     }
 
