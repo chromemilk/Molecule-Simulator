@@ -89,6 +89,8 @@ void ShowImGuiMenu( InputContext &ctx ) {
             }
             if (atoms.applyVESPR)
             {
+                ImGui::SameLine();
+                  
                 ImGui::Checkbox( "Use large-molecule VSEPR", &atoms.fastCorrection );
             }
            
