@@ -45,6 +45,8 @@ public:
 
     void build( const std::vector<std::string> &symbols );
 
+    float idealAnglePair( const Atom &C, const glm::vec3 &vA, const glm::vec3 &vB );
+
     bool isPolar = false;
     float latestCorrectionStrength = 0.f;
     int singleBonds = 0;
@@ -74,6 +76,9 @@ public:
 
     std::string firstCentralGeometry;
 
+	float correctionProportion = 0.5f; // how much to correct the bond angles
+	float maxCorrectionPerStep = 10.0f; // max correction per step
+
     void clear();
 
 
@@ -81,7 +86,7 @@ public:
 private:
     void applyVSEPRForces( float dt );
     void applyVSEPRAngleFast( float dt );
-    void renderBondAngles( int w, int h, const Camera &camera );
+    void renderBondAngles( int w, int h, const Camera &camera, const Atom *hovered );
     float getIdealBondAngle( const Atom &a );
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
     std::string determineGeometry( const Atom & ) const;

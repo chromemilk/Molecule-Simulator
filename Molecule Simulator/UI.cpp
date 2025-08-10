@@ -75,10 +75,10 @@ void ShowImGuiMenu( InputContext &ctx ) {
                 atoms.clear(); ctx.currentPrebuiltAtom.clear();
             }
 
-            ImGui::Separator();
+            ImGui::SeparatorText("Physics Engine Options");
             ImGui::Checkbox( "Molecule Stability System", &atoms.betterStabilization );
             ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
-            ImGui::Checkbox( "Energy-minimization VSEPR (better for more complex molecules)", &atoms.fastCorrection );
+            ImGui::SeparatorText( "VSEPR Options & PID" );
             ImGui::Checkbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
 			ImGui::Checkbox( "Apply VSEPR", &atoms.applyVESPR );
             if (ImGui::IsItemHovered())
@@ -87,6 +87,12 @@ void ShowImGuiMenu( InputContext &ctx ) {
                 ImGui::Text( "Enable this for molecules that only have one central atom; it helps with performance" );
                 ImGui::EndTooltip();
             }
+            if (atoms.applyVESPR)
+            {
+                ImGui::Checkbox( "Use large-molecule VSEPR", &atoms.fastCorrection );
+            }
+           
+
             ImGui::EndTabItem();
         }
 
@@ -126,6 +132,15 @@ void ShowImGuiMenu( InputContext &ctx ) {
             {
                 runMoleculeTests( atoms, *ctx.textRenderer );
             }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem( "Advanced" ))
+        {
+            ImGui::Text( "VSEPR PID Options" );
+            ImGui::SliderFloat( "Proportion", &atoms.correctionProportion, 0.1f, 1.0f, "%.2f" );
+            ImGui::SliderFloat( "Step Size (degrees)", &atoms.maxCorrectionPerStep, 1.0f, 50.0f, "%.0f" );
+
             ImGui::EndTabItem();
         }
 

@@ -25,7 +25,7 @@ void AtomSystem::update( float dt ) {
         b.applyForce();
     }
 
-    if (applyVESPR == true)
+    if (applyVESPR)
     {
         if (fastCorrection)
         {
@@ -151,7 +151,7 @@ void AtomSystem::render( int w, int h, Atom *selectedAtom, Atom *hoveredAtom, At
 
 
     // Render the computed bond angles
-    renderBondAngles( w, h, camera );
+    renderBondAngles( w, h, camera, hoveredAtom );
 
     // Render computed geometry
     if (!firstCentralGeometry.empty()) {
@@ -231,42 +231,76 @@ static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
     return (len > eps) ? v / len : glm::vec3( 0.0f );
 }
 
+
 void AtomSystem::applyVSEPRForces( float dt ) {
+    float k = correctionProportion;
+    float maxStep = glm::radians( maxCorrectionPerStep ); // cap per frame
+    latestCorrectionStrength = 0.0f;
+
     for (auto &atom : atoms)
     {
-        if (atom.bondedAtoms.size() < 2) continue;
+        const size_t n = atom.bondedAtoms.size();
+        if (n < 2) continue;
 
-        for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
+        // steric number for pairwise targets (AX5/AX6)
+        const int totalDomains =
+            int( atom.bondedAtoms.size() ) + atom.lonePairs + (atom.hasRadical ? 1 : 0);
+
+        for (size_t i = 0; i < n; ++i)
         {
-            for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
+            for (size_t j = i + 1; j < n; ++j)
             {
-                // Get angle vertex
-                Atom *neighborA = atom.bondedAtoms[ i ];
-                Atom *neighborB = atom.bondedAtoms[ j ];
-                // Normalize position
-                glm::vec3 vecA = glm::normalize( neighborA->position - atom.position );
-                glm::vec3 vecB = glm::normalize( neighborB->position - atom.position );
+                Atom *A = atom.bondedAtoms[ i ];
+                Atom *B = atom.bondedAtoms[ j ];
 
-                // Compute the needed angle, and see how far away we are
-                float currentAngle = glm::degrees( acos( glm::clamp( glm::dot( vecA, vecB ), -1.0f, 1.0f ) ) );
-                float idealAngle = getIdealBondAngle( atom );
+                glm::vec3 vA = A->position - atom.position;
+                glm::vec3 vB = B->position - atom.position;
+                if (glm::length2( vA ) < 1e-8f || glm::length2( vB ) < 1e-8f) continue;
 
-                float angleError = currentAngle - idealAngle;
+                glm::vec3 a = glm::normalize( vA );
+                glm::vec3 b = glm::normalize( vB );
 
-                if (fabs( angleError ) > 0.5f)
+                float current = glm::degrees( acos( glm::clamp( glm::dot( a, b ), -1.0f, 1.0f ) ) );
+
+                // Pairwise angle targets for AX5/AX6 (others use a single target)
+                float ideal = getIdealBondAngle( atom );
+                if (totalDomains == 5 || totalDomains == 6)
                 {
-                    // Set correction magnitude 
-                    glm::vec3 correction = glm::normalize( vecA + vecB ) * (angleError * 0.2f);
-
-
-
-                    // Correct the angles
-                    if (!neighborA->fixed) neighborA->velocity += correction;
-                    if (!neighborB->fixed) neighborB->velocity += correction;
-
-                    // Display saved correction vector 
-                    latestCorrectionStrength = glm::length( correction );
+                    if (current > 150.0f)      ideal = 180.0f; // axial–axial
+                    else if (current > 105.0f) ideal = 120.0f; // equatorial–equatorial
+                    else                       ideal = 90.0f;  // axial–equatorial (or octahedral equivalents)
                 }
+
+                float delta = ideal - current; // + means "increase angle"
+                if (fabsf( delta ) <= 0.5f) continue;
+
+                glm::vec3 axis = glm::cross( a, b );
+                float axisLen2 = glm::dot( axis, axis );
+                if (axisLen2 < 1e-10f) continue;
+                axis = glm::normalize( axis );
+
+                // dt-scaled, clamped step; sign chosen so +delta expands angle
+                float step = glm::clamp( glm::radians( delta ) * k * dt, -maxStep, +maxStep );
+
+                auto rotateHalf = [&]( Atom *nb, float signedHalf ) {
+                    if (!nb || nb->fixed) return;
+                    glm::vec3 fromC = nb->position - atom.position;
+                    float r = glm::length( fromC );
+                    if (r < 1e-6f) return;
+
+                    glm::vec3 dir = fromC / r;
+                    // Opposite rotations around the same axis change the pair angle.
+                    // To increase the angle when delta>0, rotate A by -step/2 and B by +step/2.
+                    glm::mat4 R = glm::rotate( glm::mat4( 1.0f ), signedHalf, axis );
+                    glm::vec3 newDir = glm::normalize( glm::vec3( R * glm::vec4( dir, 0 ) ) );
+                    nb->position = atom.position + newDir * r;
+                    nb->velocity *= 0.90f; // mild damping prevents ping-pong
+                    };
+
+                rotateHalf( A, -0.5f * step );
+                rotateHalf( B, +0.5f * step );
+
+                latestCorrectionStrength = std::max( latestCorrectionStrength, fabsf( delta ) );
             }
         }
     }
@@ -302,113 +336,205 @@ static void addVirtualLonePairs( const Atom &C, std::vector<Dir> &out ) {
 
 
 void AtomSystem::applyVSEPRAngleFast( float dt ) {
-    const float kRep = 6.0f;                   
-    const float maxStep = glm::radians( 6.0f );      
-    const float velocityDamp = 0.90f;                // extra damping
+    const float kRepBase = 6.0f;
+    const float maxStep = glm::radians( 6.0f );
+    const float velocityDamp = 0.90f;
+
+    auto isHeavy = []( const Atom *a ) {
+        return a && a->type != "H" && a->type != "LP";
+        };
 
     std::vector<glm::vec3> torque( atoms.size(), glm::vec3( 0 ) );
 
     for (Atom &C : atoms)
     {
-        int nb = static_cast<int>(C.bondedAtoms.size());
-        int lp = C.lonePairs;
-        if (nb + lp < 2) continue;
+       
+        std::vector<Dir> dom;
 
-        std::vector<Dir> dom; dom.reserve( nb + lp );
-
-        /* 1. real bonds */
         for (Atom *B : C.bondedAtoms)
         {
+            if (!isHeavy( B )) continue;                   
             glm::vec3 d = B->position - C.position;
-            float r = glm::length( d );  if (r < 1e-4f) r = 1e-4f;
-            int idx = static_cast<int>( &B[ 0 ] - &atoms[ 0 ] );
+            float r = glm::length( d ); if (r < 1e-4f) r = 1e-4f;
+            int idx = int( &B[ 0 ] - &atoms[ 0 ] );
             dom.push_back( { d / r, r, idx, !B->fixed } );
         }
 
-        addVirtualLonePairs( C, dom );   // helper shown a few lines below
+        addVirtualLonePairs( C,  dom ); // or copy the helper’s push_back logic
+
+        if (dom.size() < 2) continue;
+
+        // Scale repulsion by domain count so big coordinations don’t blow up
+        const float kRep = kRepBase / float( std::max<int>( 1, (int)dom.size() - 1 ) );
 
         for (int i = 0; i < (int)dom.size(); ++i)
+        {
             for (int j = i + 1; j < (int)dom.size(); ++j)
             {
                 glm::vec3 diff = dom[ i ].v - dom[ j ].v;
                 float d2 = glm::dot( diff, diff ) + 1e-4f;
-                glm::vec3 f = kRep * diff / (d2 * std::sqrt( d2 ));   
+                glm::vec3 f = kRep * diff / (d2 * std::sqrt( d2 ));  // inverse-cube, softened
+
                 if (dom[ i ].movable) torque[ dom[ i ].idx ] += f;
                 if (dom[ j ].movable) torque[ dom[ j ].idx ] -= f;
             }
+        }
     }
 
+    // Choose a stable pivot for B: prefer heavy neighbor with highest bond order; avoid H pivots
+    auto choosePivotFor = [&]( Atom &B ) -> Atom *{
+        Atom *best = nullptr; int bestOrder = -1;
+        for (Atom *N : B.bondedAtoms)
+        {
+            if (!isHeavy( N )) continue;                    
+            int order = 0;
+            for (const Bond &bd : bonds)
+            {
+                bool match = (bd.atomA == &B && bd.atomB == N) || (bd.atomB == &B && bd.atomA == N);
+                if (match)
+                {
+                    order = bd.bondOrder(); break;
+                }
+            }
+            if (order > bestOrder)
+            {
+                bestOrder = order; best = N;
+            }
+        }
+        if (!best && !B.bondedAtoms.empty()) best = B.bondedAtoms.front();
+        return best;
+        };
+
+    // Integrate: rotate each movable atom around its pivot using only tangential torque
     for (size_t idx = 0; idx < atoms.size(); ++idx)
     {
         Atom &B = atoms[ idx ];
-        if (B.fixed || glm::length2( torque[ idx ] ) < 1e-10f) continue;
-        Atom *C = B.bondedAtoms.empty() ? nullptr : B.bondedAtoms.front();
-        if (!C) continue;                                // safety
+        if (B.fixed) continue;
 
-        glm::vec3 dir = glm::normalize( B.position - C->position );
-        glm::vec3 tang = torque[ idx ] - glm::dot( torque[ idx ], dir ) * dir;
+        glm::vec3 T = torque[ idx ];
+        if (glm::length2( T ) < 1e-10f) continue;
+
+        Atom *C = choosePivotFor( B );
+        if (!C) continue;
+
+        glm::vec3 dir = B.position - C->position;
+        float r = glm::length( dir ); if (r < 1e-6f) continue;
+        dir /= r;
+
+        glm::vec3 tang = T - glm::dot( T, dir ) * dir;             // strip radial component
         float ang = glm::clamp( glm::length( tang ) * dt, 0.0f, maxStep );
         if (ang < 1e-5f) continue;
 
-        glm::vec3 axis = glm::normalize( glm::cross( dir, tang ) );
+        glm::vec3 axis = glm::cross( dir, tang );
+        float axisLen2 = glm::dot( axis, axis );
+        if (axisLen2 < 1e-12f) continue;
+        axis = glm::normalize( axis );
+
         glm::mat4 R = glm::rotate( glm::mat4( 1.0f ), ang, axis );
         glm::vec3 newDir = glm::normalize( glm::vec3( R * glm::vec4( dir, 0 ) ) );
+        B.position = C->position + newDir * r;
 
-        float bondLen = glm::distance( B.position, C->position );
-        B.position = C->position + newDir * bondLen;
-        B.velocity *= velocityDamp;                      // kill ping-pong
+        B.velocity *= velocityDamp;
     }
 }
 
 
-void AtomSystem::renderBondAngles( int windowWidth, int windowHeight,
-    const Camera &camera ) {
+static inline bool angleInWindow( float deg, float minDeg = 15.0f, float maxDeg = 181.0f ) {
+    return deg >= minDeg && deg <= maxDeg;
+}
+
+static inline bool sepOK( const glm::vec3 &a, const glm::vec3 &b, float minSin = 0.26f ) {
+    return glm::length( glm::cross( a, b ) ) >= minSin;
+}
+
+bool isAngleVertex( const Atom &C ) {
+    std::vector<glm::vec3> dirs;
+    dirs.reserve( C.bondedAtoms.size() );
+    for (Atom *n : C.bondedAtoms)
+    {
+        glm::vec3 d = n->position - C.position;
+        float L2 = glm::dot( d, d );
+        if (L2 > 1e-8f) dirs.push_back( d / glm::sqrt( L2 ) );
+    }
+    if (dirs.size() < 2) return false;
+
+    for (size_t i = 0; i < dirs.size(); ++i)
+    {
+        for (size_t j = i + 1; j < dirs.size(); ++j)
+        {
+            float c = glm::clamp( glm::dot( dirs[ i ], dirs[ j ] ), -1.0f, 1.0f );
+            float deg = glm::degrees( std::acos( c ) );
+            if (deg > 1e-4f && deg < 180.0f - 1e-4f) return true;
+            if (fabsf( deg ) <= 1e-4f || fabsf( deg - 180.0f ) <= 1e-4f) return true; // explicit 0°/180° ok
+        }
+    }
+    return false;
+}
+
+
+void AtomSystem::renderBondAngles( int windowWidth, int windowHeight, const Camera &camera, const Atom *hovered ) {
+    if (!hovered) return;
+
+    const Atom *center = nullptr;
+    for (const Atom &a : atoms) if (&a == hovered)
+    {
+        center = &a; break;
+    }
+    if (!center) return;
+
+    if (!isAngleVertex( *center )) return;  
+
+    // Collect normalized neighbor directions
+    std::vector<Atom *> nbrs( center->bondedAtoms.begin(), center->bondedAtoms.end() );
+    if (nbrs.size() < 2) return;
+
+    auto safeNorm = []( const glm::vec3 &v ) {
+        float L2 = glm::dot( v, v ); return (L2 > 1e-8f) ? v / glm::sqrt( L2 ) : glm::vec3( 0 );
+        };
+
     glm::mat4 proj = glm::perspective( glm::radians( camera.Zoom ),
         float( windowWidth ) / float( windowHeight ),
         0.1f, 100.0f );
     glm::mat4 view = camera.GetViewMatrix();
-
     glm::vec4 viewport( 0.f, 0.f, float( windowWidth ), float( windowHeight ) );
 
-    for (Atom &atom : atoms)
+    float bestDeg = 1e9f;
+    Atom *Astar = nullptr, *Bstar = nullptr;
+    glm::vec3 vA{}, vB{};
+    for (size_t i = 0; i < nbrs.size(); ++i)
     {
-        if (atom.bondedAtoms.size() < 2) continue;
-
-        for (size_t i = 0; i < atom.bondedAtoms.size(); ++i)
+        for (size_t j = i + 1; j < nbrs.size(); ++j)
         {
-            for (size_t j = i + 1; j < atom.bondedAtoms.size(); ++j)
+            glm::vec3 a = safeNorm( nbrs[ i ]->position - center->position );
+            glm::vec3 b = safeNorm( nbrs[ j ]->position - center->position );
+            float c = glm::clamp( glm::dot( a, b ), -1.0f, 1.0f );
+            float deg = glm::degrees( std::acos( c ) );
+            if (deg < bestDeg)
             {
-                Atom *A = atom.bondedAtoms[ i ];
-                Atom *B = atom.bondedAtoms[ j ];
-
-                // compute angle
-                glm::vec3 vA = glm::normalize( A->position - atom.position );
-                glm::vec3 vB = glm::normalize( B->position - atom.position );
-                float angle = glm::degrees( acos( glm::clamp( glm::dot( vA, vB ), -1.f, 1.f ) ) );
-
-                // compute label world-space position on the bisector
-                glm::vec3 bisector = glm::normalize( vA + vB );
-                float   offset = 0.4f;  // adjust to taste
-                glm::vec3 labelWorld = atom.position + bisector * offset;
-
-                // project to screen
-                glm::vec3 win = glm::project( labelWorld, view, proj, viewport );
-                if (win.z < 0.0f || win.z > 1.0f) continue; // behind camera or beyond far plane
-
-                // convert to top-left origin if needed
-                float sx = win.x;
-                float sy = windowHeight - win.y;
-
-                // draw
-                std::string label =
-                    "[ANGLE] Real: " + std::to_string( int( angle ) ) +
-                    " | Ideal: " + std::to_string( int( getIdealBondAngle( atom ) ) );
-                textRenderer.DrawScreenText( label, sx, sy, windowWidth, windowHeight );
+                bestDeg = deg; Astar = nbrs[ i ]; Bstar = nbrs[ j ]; vA = a; vB = b;
             }
         }
     }
-}
+    if (!Astar || !Bstar) return;
 
+    float ideal = idealAnglePair( *center, vA, vB );
+
+    glm::vec3 bis = safeNorm( vA + vB );
+    if (glm::length2( bis ) < 1e-8f)
+    {
+        glm::vec3 n = safeNorm( glm::cross( vA, vB ) );
+        glm::vec3 alt = safeNorm( glm::cross( n, vA ) );
+        bis = (glm::length2( alt ) > 1e-8f) ? alt : vA;
+    }
+
+    glm::vec3 labelWorld = center->position + bis * 0.35f;
+    glm::vec3 win = glm::project( labelWorld, view, proj, viewport );
+    if (win.z < 0.0f || win.z > 1.0f) return;
+
+    char buf[ 96 ];
+    std::snprintf( buf, sizeof( buf ), "[ANGLE] %.0f | (ideal %.0f)", bestDeg, ideal );
+    textRenderer.DrawScreenText( buf, win.x, windowHeight - win.y, windowWidth, windowHeight );
+}
 
 
 
@@ -915,4 +1041,16 @@ void AtomSystem::build( const std::vector<std::string> &symbols ) {
     Resonance::Generator gen( symbols );
     const auto bonds = gen.bestStructure();
     build( symbols, bonds );
+}
+
+float AtomSystem::idealAnglePair( const Atom &C, const glm::vec3 &vA, const glm::vec3 &vB ) {
+    float ang = glm::degrees( acos( glm::clamp( glm::dot( vA, vB ), -1.f, 1.f ) ) );
+    int total = int( C.bondedAtoms.size() ) + C.lonePairs + (C.hasRadical ? 1 : 0);
+    if (total == 5 || total == 6)
+    {
+        if (ang > 150.f) return 180.f;
+        if (ang > 105.f) return 120.f;
+        return 90.f;
+    }
+    return getIdealBondAngle( C );
 }
