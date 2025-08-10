@@ -15,8 +15,8 @@ void Bond::applyForce() {
     if (L == 0) return;
 
     glm::vec3 dir = d / L;
-    float      k = 4.0f;                 // spring constant
-    float      x = L - restLen;          
+    float k = 4.0f;                 // spring constant
+    float x = L - restLen;          
     glm::vec3  F = k * x * dir;
 
     if (!atomA->fixed) atomA->velocity += F / atomA->mass;

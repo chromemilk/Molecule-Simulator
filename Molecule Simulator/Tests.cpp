@@ -22,14 +22,13 @@ void runMoleculeTests( [[maybe_unused]] AtomSystem & /*unused*/, TextRenderer &t
 
     struct TestCase
     {
-        std::string                             name;
-        std::string                             formula;
-        std::function<bool( const AtomSystem & )>  validate;
-        std::string                             expected;
+        std::string name;
+        std::string formula;
+        std::function<bool( const AtomSystem & )> validate;
+        std::string expected;
     };
 
-    std::cout << "Init Unit Tests For System: RESONANCE\n"
-        << "-------------------------------------\n";
+    std::cout << "Init Unit Tests For System: RESONANCE\n";
 
     const std::vector<TestCase> tests{
         {"Methanol (CH3OH)", "CH3OH",

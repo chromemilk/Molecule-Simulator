@@ -78,7 +78,7 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::SeparatorText("Physics Engine Options");
             ImGui::Checkbox( "Molecule Stability System", &atoms.betterStabilization );
             ImGui::Checkbox( "Follow Camera", &atoms.followCamera );
-            ImGui::SeparatorText( "VSEPR Options & PID" );
+            ImGui::SeparatorText( "VSEPR Options" );
             ImGui::Checkbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
 			ImGui::Checkbox( "Apply VSEPR", &atoms.applyVESPR );
             if (ImGui::IsItemHovered())
@@ -128,10 +128,7 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::BulletText( "Click 2 atoms + 1/2/3 – bond order" );
             ImGui::BulletText( "Right-click 2 atoms – break bond" );
             ImGui::Separator();
-            if (ImGui::Button( "Run Unit Tests" ))
-            {
-                runMoleculeTests( atoms, *ctx.textRenderer );
-            }
+        
             ImGui::EndTabItem();
         }
 
@@ -140,7 +137,10 @@ void ShowImGuiMenu( InputContext &ctx ) {
             ImGui::Text( "VSEPR PID Options" );
             ImGui::SliderFloat( "Proportion", &atoms.correctionProportion, 0.1f, 1.0f, "%.2f" );
             ImGui::SliderFloat( "Step Size (degrees)", &atoms.maxCorrectionPerStep, 1.0f, 50.0f, "%.0f" );
-
+            if (ImGui::Button( "Run Unit Tests" ))
+            {
+                runMoleculeTests( atoms, *ctx.textRenderer );
+            }
             ImGui::EndTabItem();
         }
 

@@ -27,10 +27,10 @@ struct InputContext
 
     std::string currentPrebuiltAtom;
     std::string buildSymbol;
-    bool  deleteMode = false;
+    bool deleteMode = false;
 
     // Bond order to create with the next click pair (1/2/3)
-    int   nextOrder = 1;
+    int nextOrder = 1;
 
     ControlMode currentMode = ControlMode::FLY_CAMERA;
 
@@ -44,11 +44,9 @@ struct InputContext
     float   grabPlaneY = 0.f;       // plane y-coord where grab started
     glm::vec3 grabRayDir;
 
-    // Mouse-look bookkeeping
-    bool  firstMouse = true;
+    bool firstMouse = true;
     float lastX = 0.f, lastY = 0.f;
 
-    // Window size – kept in sync by framebuffer callback
     int winWidth = WIN_W;
     int winHeight = WIN_H;
 };

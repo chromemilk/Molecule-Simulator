@@ -12,6 +12,17 @@ namespace Resonance {
     
     inline bool centralOnlyBonding = false;
 
+    struct SearchCaps
+    {
+        enum Level
+        {
+            Fast, Balanced, Exhaustive
+        } level = Balanced;
+        int maxNodes = 50000;            // cap recursive nodes
+        int maxStructures = 256;         // cap bag size
+    };
+
+
     class Generator {
     public:
 
@@ -27,9 +38,13 @@ namespace Resonance {
         bool hypervalent( const std::vector<Bond> & ) const;
 
     private:
+        SearchCaps caps_;
+        int nodesVisited_ = 0;
         std::vector<std::string> symbols;   // heavy atoms first, hydrogens last
         int heavyCnt{ 0 };
         int targetCharge = 0;
+        std::vector<std::vector<uint8_t>> allowed_; 
+        void buildSkeletonAndSeed( std::vector<uint8_t> &valLeft, std::vector<Bond> &seed );
         int netCharge( const std::vector<Bond> & ) const;
 
         static uint8_t typicalValence(std::string sym);

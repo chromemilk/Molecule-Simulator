@@ -18,9 +18,7 @@ namespace Resonance
 {
 
 
-    // Preferred valence options for elements where chemistry strongly restricts
-    // the number of bonds that can be formed.  Elements not present in this map
-    // will derive their options algorithmically from the periodic table data.
+
     static string stripCharge( string s ) {
         if (!s.empty() && (s.back() == '+' || s.back() == '-'))
         {
@@ -410,6 +408,7 @@ namespace Resonance
         for (auto m : legal)
             if (fcSum( *m ) == bestFC) fcFiltered.push_back( m );
 
+    
         auto score = [&]( const std::vector<Bond> &mol )
             {
                 int dbl = 0, tri = 0, sum = 0;
@@ -430,50 +429,12 @@ namespace Resonance
                 for (std::size_t i = 0; i < symbols.size(); ++i)
                     typDev += std::abs( bondCnt[ i ] - typicalValence( symbols[ i ] ) );
 
-                int over = 0;
-                for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
+                int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
+                int conn = static_cast<int>( mol.size() );
 
-                auto find_parent = [&]( auto &p, int x ) -> int {
-                    while (p[ x ] != x) x = p[ x ] = p[ p[ x ] ];
-                    return x;
-                    };
-                auto unite = [&]( auto &p, int a, int b ) {
-                    a = find_parent( p, a ); b = find_parent( p, b );
-                    if (a != b) p[ b ] = a;
-                    };
-
-                int heavy = heavyCnt;                  
-                std::vector<int> parent( heavy );
-                std::iota( parent.begin(), parent.end(), 0 );
-
-                int heavyEdges = 0;
-                for (auto [i, j, o] : mol)
-                {
-                    if (i < heavy && j < heavy)
-                    {
-                        ++heavyEdges;               
-                        unite( parent, i, j );
-                    }
-                }
-                int comps = 0;
-                for (int v = 0; v < heavy; ++v)
-                    if (find_parent( parent, v ) == v) ++comps;
-
-                int conn = static_cast<int>( mol.size() );   
-
-             
-                return std::tuple{
-                    comps,          // 1
-                    over,           // 2
-                    typDev,         // 3
-                    tri,            // 4a
-                    dbl,            // 4b
-                    -heavyEdges,    // 5
-                    -conn,          // 6a
-                    -sum            // 6b
-                };
+                /* smaller tuple = better */
+                return std::tuple{ dbl, -typDev, -over, conn, -tri, sum };
             };
-       
 
         const auto *best = *std::min_element( fcFiltered.begin(), fcFiltered.end(),
             [&]( auto a, auto b ) { return score( *a ) < score( *b ); } );

@@ -21,7 +21,7 @@
 
 
 static Raytracer ray;          
-static bool      useRT = false;
+static bool useRT = false; // Dont use this 
 
 //--------------------------------------------------
 int main() {
@@ -40,7 +40,7 @@ int main() {
         return 1;
     }
     glfwMakeContextCurrent( window );
-    glfwSwapInterval( 1 ); // v?sync
+    glfwSwapInterval( 1 ); 
 
     if (!gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ))
     {
@@ -128,7 +128,7 @@ int main() {
         textRenderer.DrawScreenText( "Double Bonds: " + std::to_string( atoms.doubleBonds ), 10, 130, fbW, fbH );
         textRenderer.DrawScreenText( "Triple Bonds: " + std::to_string( atoms.tripleBonds ), 10, 150, fbW, fbH );
         textRenderer.DrawScreenText( "Sigma Bonds:  " + std::to_string( atoms.sigmaBonds ), 10, 170, fbW, fbH );
-        textRenderer.DrawScreenText( "Pi Bonds:     " + std::to_string( atoms.piBonds ), 10, 190, fbW, fbH );
+        textRenderer.DrawScreenText( "PI Bonds:     " + std::to_string( atoms.piBonds ), 10, 190, fbW, fbH );
         float stability = glm::clamp( 1.f - 0.5f * atoms.latestCorrectionStrength, 0.f, 1.f );
         textRenderer.DrawScreenText( "Simulation Stability: " + std::to_string( stability * 100.f ) + "%", 10, 210, fbW, fbH );
         textRenderer.DrawScreenText( "WASD move - TAB edit mode", 10, 230, fbW, fbH );
