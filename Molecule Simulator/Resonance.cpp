@@ -29,13 +29,50 @@ namespace Resonance
         return s;
     }
 
-    static const std::unordered_map<string, vector<uint8_t>> kValenceOpts = {
-        {"H",{1}},                       {"C",{4}},
-        {"N",{3,4,5}},                   {"O",{2,3}},
-        {"P",{3,5,6}},                   {"S",{2,4,6}},
-        {"F",{1}},   {"Cl",{1,3,5,7}},   {"Br",{1,3,5,7}}, {"I",{1,3,5,7}},
-        {"Ar",{0,2}}, {"Kr",{0,2,4,6}},   {"Xe",{0,2,4,6}}
+    static const std::unordered_map<std::string, std::vector<uint8_t>> kValenceOpts = {
+        // 1st row
+        {"H",{1}}, {"He",{0}},
+        // 2nd row
+        {"Li",{1}}, {"Be",{2,4}}, {"B",{3,4}}, {"C",{4}},
+        {"N",{3,4,5}}, {"O",{2,3}}, {"F",{1}}, {"Ne",{0}},
+        // 3rd row
+        {"Na",{1}}, {"Mg",{2}}, {"Al",{3,4}}, {"Si",{4}},
+        {"P",{3,5,6}}, {"S",{2,4,6}}, {"Cl",{1,3,5}}, {"Ar",{0,2}},
+        // 4th row (add transition metals)
+        {"K",{1}}, {"Ca",{2}},
+        {"Sc",{2,3}}, {"Ti",{2,3,4}}, {"V",{3,4,5}}, {"Cr",{2,3,6}}, {"Mn",{2,4,7}},
+        {"Fe",{2,3}}, {"Co",{2,3}}, {"Ni",{2,3}}, {"Cu",{1,2}}, {"Zn",{2}},
+        {"Ga",{3,4}}, {"Ge",{4}},
+        {"As",{3,5}}, {"Se",{2,4,6}}, {"Br",{1,3,5}}, {"Kr",{0,2,4}},
+        // 5th row
+        {"Rb",{1}}, {"Sr",{2}},
+        {"Y",{3}}, {"Zr",{2,3,4}}, {"Nb",{3,4,5}}, {"Mo",{2,4,6}}, {"Tc",{4,5,7}},
+        {"Ru",{3,4,8}}, {"Rh",{1,3,4}}, {"Pd",{2,3,4}}, {"Ag",{1,2,3}}, {"Cd",{2}},
+        {"In",{1,3}}, {"Sn",{2,4}},
+        {"Sb",{3,5}}, {"Te",{2,4,6}}, {"I",{1,3,5}}, {"Xe",{0,2,4}},
+        // 6th row
+        {"Cs",{1}}, {"Ba",{2}},
+        // Lanthanides
+        {"La",{3}}, {"Ce",{3,4}}, {"Pr",{3,4}}, {"Nd",{2,3,4}}, {"Pm",{3}},
+        {"Sm",{2,3}}, {"Eu",{2,3}}, {"Gd",{3}}, {"Tb",{3,4}}, {"Dy",{3}},
+        {"Ho",{3}}, {"Er",{3}}, {"Tm",{2,3}}, {"Yb",{2,3}}, {"Lu",{3}},
+        // 6th row transition metals cont.
+        {"Hf",{2,3,4}}, {"Ta",{3,4,5}}, {"W",{4,5,6}}, {"Re",{4,6,7}},
+        {"Os",{4,6,8}}, {"Ir",{3,4,6}}, {"Pt",{2,4,6}}, {"Au",{1,3}}, {"Hg",{1,2}},
+        {"Tl",{1,3}}, {"Pb",{2,4}},
+        {"Bi",{3,5}}, {"Po",{2,4,6}}, {"At",{1,3,5}}, {"Rn",{0,2}},
+        // 7th row
+        {"Fr",{1}}, {"Ra",{2}},
+        // Actinides
+        {"Ac",{3}}, {"Th",{3,4}}, {"Pa",{3,4,5}}, {"U",{4,5,6}}, {"Np",{4,5,6}},
+        {"Pu",{3,4,6}}, {"Am",{3,4,6}}, {"Cm",{3}}, {"Bk",{3,4}}, {"Cf",{2,3,4}},
+        {"Es",{3}}, {"Fm",{2,3}}, {"Md",{2,3}}, {"No",{2}}, {"Lr",{3}},
+        // Post-actinide/superheavy p-block
+        {"Rf",{4}}, {"Db",{5}}, {"Sg",{6}}, {"Bh",{5,7}}, {"Hs",{6}},
+        {"Mt",{1,3}}, {"Ds",{2,4}}, {"Rg",{1,3}}, {"Cn",{2}},
+        {"Nh",{1,3}}, {"Fl",{2,4}}, {"Mc",{1,3}}, {"Lv",{2,4}}, {"Ts",{1,3,5}}, {"Og",{0,2}}
     };
+
 
     static uint8_t maxValenceFor( const string &sym ) {
         string base = stripCharge( sym );
@@ -62,16 +99,49 @@ namespace Resonance
         for (uint8_t v = 1; v <= m; ++v) opts.push_back( v );
         return opts;
     }
-
-    static const std::unordered_map<string, uint8_t> kTypV = {
-        {"H",1},{"C",4},{"N",4},{"O",2},
-        {"F",1},{"Cl",3},{"Br",3},{"I",3},
-        {"P",5},{"As",5},{"Sb",5},
-        {"S",6},{"Se",6},{"Te",6},
-        {"B",3},{"Al",3},{"Ga",3},{"In",3},
-        {"Xe",4},{"Kr",4},{"Ar",2},
+    static const std::unordered_map<std::string, uint8_t> kTypV = {
+        // 1st row
+        {"H",1}, {"He",0},
+        // 2nd row
+        {"Li",1}, {"Be",2}, {"B",3}, {"C",4},
+        {"N",4}, {"O",2}, {"F",1}, {"Ne",0},
+        // 3rd row
+        {"Na",1}, {"Mg",2}, {"Al",3}, {"Si",4},
+        {"P",5}, {"S",6}, {"Cl",3}, {"Ar",2},
+        // 4th row
+        {"K",1}, {"Ca",2},
+        {"Sc",3}, {"Ti",4}, {"V",5}, {"Cr",3}, {"Mn",2},
+        {"Fe",3}, {"Co",2}, {"Ni",2}, {"Cu",2}, {"Zn",2},
+        {"Ga",3}, {"Ge",4},
+        {"As",5}, {"Se",6}, {"Br",3}, {"Kr",4},
+        // 5th row
+        {"Rb",1}, {"Sr",2},
+        {"Y",3}, {"Zr",4}, {"Nb",5}, {"Mo",6}, {"Tc",7},
+        {"Ru",3}, {"Rh",3}, {"Pd",2}, {"Ag",1}, {"Cd",2},
+        {"In",3}, {"Sn",4},
+        {"Sb",5}, {"Te",6}, {"I",3}, {"Xe",4},
+        // 6th row
+        {"Cs",1}, {"Ba",2},
+        // Lanthanides
+        {"La",3}, {"Ce",3}, {"Pr",3}, {"Nd",3}, {"Pm",3},
+        {"Sm",3}, {"Eu",3}, {"Gd",3}, {"Tb",3}, {"Dy",3},
+        {"Ho",3}, {"Er",3}, {"Tm",3}, {"Yb",3}, {"Lu",3},
+        // 6th row transition metals cont.
+        {"Hf",4}, {"Ta",5}, {"W",6}, {"Re",6},
+        {"Os",4}, {"Ir",3}, {"Pt",2}, {"Au",3}, {"Hg",2},
+        {"Tl",3}, {"Pb",4},
+        {"Bi",5}, {"Po",6}, {"At",3}, {"Rn",2},
+        // 7th row
+        {"Fr",1}, {"Ra",2},
+        // Actinides
+        {"Ac",3}, {"Th",4}, {"Pa",5}, {"U",6}, {"Np",5},
+        {"Pu",4}, {"Am",3}, {"Cm",3}, {"Bk",3}, {"Cf",3},
+        {"Es",3}, {"Fm",3}, {"Md",3}, {"No",2}, {"Lr",3},
+        // Post-actinide/superheavy p-block
+        {"Rf",4}, {"Db",5}, {"Sg",6}, {"Bh",7}, {"Hs",6},
+        {"Mt",3}, {"Ds",4}, {"Rg",3}, {"Cn",2},
+        {"Nh",1}, {"Fl",2}, {"Mc",1}, {"Lv",2}, {"Ts",1}, {"Og",0}
     };
-
 
     uint8_t Generator::typicalValence( string sym ) {
         int formalCharge = 0;
@@ -158,7 +228,7 @@ namespace Resonance
         for (int i = 0; i < n; ++i)
         {
             std::string base = stripCharge( symbols[ i ] );
-            int desired = (base == "H") ? 2 : (pt.Get( base ).atomicNumber > 10 ? 12 : 8);
+            int desired = (base == "H") ? 2 : 8;
 
             int ve = pt.Get( base ).valenceElectrons;
             int bondsOwn = bondSum[ i ];
@@ -238,7 +308,7 @@ namespace Resonance
         for (int i = 0; i < n; ++i)
         {
             std::string base = stripCharge( symbols[ i ] );
-            int desired = (base == "H") ? 2 : (pt.Get( base ).atomicNumber > 10 ? 12 : 8);
+            int desired = (base == "H") ? 2 : 8;
 
             int ve = pt.Get( base ).valenceElectrons;          // valence electrons
             int bondsOwn = bondSum[ i ];                             // B/2  (one e- per bond)
@@ -257,15 +327,14 @@ namespace Resonance
         std::vector<std::vector<Bond>> &bag ) {
         if (next == heavyCnt)
         {
+            if (netCharge( current ) != targetCharge || hypervalent( current )) return;
+
             int fc = formalCharge( current );
             if (fc < bestCharge)
             {
-                bestCharge = fc; bag.clear(); bag.push_back( current );
+                bestCharge = fc; bag.clear();
             }
-            else if (fc == bestCharge)
-            {
-                bag.push_back( current );
-            }
+            if (fc == bestCharge) bag.push_back( current );
             return;
         }
 
@@ -424,7 +493,6 @@ namespace Resonance
       
         auto score = [&]( const std::vector<Bond> &mol )
             {
-                // --- basic bond stats ---
                 int dbl = 0, tri = 0, sum = 0;
                 std::vector<int> bondSum( symbols.size(), 0 );
                 for (auto [i, j, o] : mol)
@@ -435,15 +503,12 @@ namespace Resonance
                     bondSum[ i ] += o; bondSum[ j ] += o;
                 }
 
-                // typical-valence deviation
                 int typDev = 0;
                 for (std::size_t k = 0; k < symbols.size(); ++k)
                     typDev += std::abs( bondSum[ k ] - typicalValence( symbols[ k ] ) );
 
-                // multiple-bond penalty (triples weigh more automatically)
                 int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
 
-                // --- heavy subgraph ---
                 std::vector<std::vector<int>> adj( heavyCnt );
                 int heavyEdges = 0;
                 for (auto [i, j, o] : mol)
@@ -484,9 +549,7 @@ namespace Resonance
                 // desired electron count (octet/expanded) for estimating available lone pairs
                 auto &pt = PeriodicTable::Instance();
                 auto desiredE = [&]( int idx ) {
-                    std::string base = stripCharge( symbols[ idx ] );
-                    int Z = pt.Get( base ).atomicNumber;
-                    return (base == "H") ? 2 : (Z > 10 ? 12 : 8);
+                    return symbols[ idx ] == "H" ? 2 : 8;
                     };
 
                 std::vector<int> loneE( symbols.size(), 0 );

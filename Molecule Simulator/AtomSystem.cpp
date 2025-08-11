@@ -1039,7 +1039,16 @@ glm::vec3 AtomSystem::getCenter() const {
 
 void AtomSystem::build( const std::vector<std::string> &symbols ) {
     Resonance::Generator gen( symbols );
-    const auto bonds = gen.bestStructure();
+    std::vector<std::tuple<int, int, int>> bonds;
+    try
+    {
+        bonds = gen.bestStructure();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[Resonance] " << e.what() << "\n";
+        bonds.clear(); // atoms-only fallback
+    }
     build( symbols, bonds );
 }
 
