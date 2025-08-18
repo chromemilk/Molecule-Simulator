@@ -294,7 +294,7 @@ void AtomSystem::applyVSEPRForces( float dt ) {
                     glm::mat4 R = glm::rotate( glm::mat4( 1.0f ), signedHalf, axis );
                     glm::vec3 newDir = glm::normalize( glm::vec3( R * glm::vec4( dir, 0 ) ) );
                     nb->position = atom.position + newDir * r;
-                    nb->velocity *= 0.90f; // mild damping prevents ping-pong
+                    nb->velocity *= 0.98f; // mild damping prevents ping-pong
                     };
 
                 rotateHalf( A, -0.5f * step );
@@ -338,7 +338,7 @@ static void addVirtualLonePairs( const Atom &C, std::vector<Dir> &out ) {
 void AtomSystem::applyVSEPRAngleFast( float dt ) {
     const float kRepBase = 6.0f;
     const float maxStep = glm::radians( 6.0f );
-    const float velocityDamp = 0.90f;
+    const float velocityDamp = 0.98f;
 
     auto isHeavy = []( const Atom *a ) {
         return a && a->type != "H" && a->type != "LP";
@@ -532,7 +532,7 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight, const Came
     if (win.z < 0.0f || win.z > 1.0f) return;
 
     char buf[ 96 ];
-    std::snprintf( buf, sizeof( buf ), "[ANGLE] %.0f | (ideal %.0f)", bestDeg, ideal );
+    std::snprintf( buf, sizeof( buf ), "[ANGLE] %.0f | (Ideal %.0f)", bestDeg, ideal );
     textRenderer.DrawScreenText( buf, win.x, windowHeight - win.y, windowWidth, windowHeight );
 }
 
@@ -1003,7 +1003,7 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
 	if (sigmaBonds) os << "  Sigma: " << sigmaBonds << "\n";
 	if (piBonds) os << "  Pi: " << piBonds << "\n";
 
-    float x = 10, y = 410, dy = 20;  int i = 0;  std::string ln;
+    float x = w - 150, y = 30, dy = 20;  int i = 0;  std::string ln;
     std::istringstream iss( os.str() );
     while (std::getline(iss, ln)) {
         textRenderer.DrawScreenText(ln, x, y + i * dy, w, h), ++i;

@@ -96,10 +96,10 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
 
             {
-                auto card = BeginCenteredCard( "VSEPR Options", CARD_W );
+                auto card = BeginCenteredCard( "VSEPR/Resonance Options", CARD_W );
                 CustomMenu::CustomCheckbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip( "Enable this for molecules with one central atom for performance." );
+                    ImGui::SetTooltip( "Enable this for molecules with one central atom for performance when using the automatic resonance generator." );
                 CustomMenu::CustomCheckbox( "Apply VSEPR Forces", &atoms.applyVESPR );
                 if (atoms.applyVESPR)
                     CustomMenu::CustomCheckbox( "Large-molecule VSEPR", &atoms.fastCorrection );
