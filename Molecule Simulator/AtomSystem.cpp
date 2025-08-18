@@ -155,7 +155,7 @@ void AtomSystem::render( int w, int h, Atom *selectedAtom, Atom *hoveredAtom, At
 
     // Render computed geometry
     if (!firstCentralGeometry.empty()) {
-        textRenderer.DrawScreenText("Geometry: " + firstCentralGeometry, 10, 90, w, h);
+        textRenderer.DrawScreenText("Geometry: " + firstCentralGeometry, (w / 2) - 30, 30, w, h);
     }
 
     // Draw the relevant info for the active atom
@@ -1062,4 +1062,18 @@ float AtomSystem::idealAnglePair( const Atom &C, const glm::vec3 &vA, const glm:
         return 90.f;
     }
     return getIdealBondAngle( C );
+}
+
+bool AtomSystem::hasHyrdogenBonds() {
+    // Hydrogen bonding: look for N, O, or F bonded to H
+    for (const Bond& bond : bonds) {
+        Atom* a = bond.atomA;
+        Atom* b = bond.atomB;
+        // Check if one atom is hydrogen and the other is N, O, or F
+        if ((a->type == "H" && (b->type == "N" || b->type == "O" || b->type == "F")) ||
+            (b->type == "H" && (a->type == "N" || a->type == "O" || a->type == "F"))) {
+            return true;
+        }
+    }
+    return false;
 }

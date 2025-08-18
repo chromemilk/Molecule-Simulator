@@ -192,11 +192,33 @@ int main() {
                 camera );
         }
 
+
+
         float dipole = atoms.computeDipole();
-        textRenderer.DrawScreenText( ctx.currentPrebuiltAtom +
-            " -- Polarity: " + std::string( atoms.isPolar ? "Polar" : "Non Polar" ), 10, 30, fbW, fbH );
-        textRenderer.DrawScreenText( "Dipole Magnitude: " + std::to_string( dipole ), 10, 50, fbW, fbH );
-        textRenderer.DrawScreenText( "Adjustment Magnitude: " + std::to_string( atoms.latestCorrectionStrength ), 10, 70, fbW, fbH );
+        std::string IForces = "";
+        atoms.hasLDF = false;
+        atoms.hasDDI = false;
+        atoms.hasHB = false;
+        if (atoms.getBonds().size() > 0)
+        {
+            IForces += "LDF, ";
+            atoms.hasLDF = true;
+        }
+        if (atoms.isPolar == true)
+        {
+            IForces += "DDI, ";
+            atoms.hasDDI = true;
+        }
+        if (atoms.hasHyrdogenBonds() == true)
+        {
+            IForces += "HB";
+            atoms.hasHB = true;
+        }
+
+        textRenderer.DrawScreenText( ctx.currentPrebuiltAtom + " -- Polarity: " + std::string( atoms.isPolar ? "Polar" : "Non Polar" ), 10, 30, fbW, fbH );
+        textRenderer.DrawScreenText( "Forces: " + IForces, 10, 50, fbW, fbH );
+        textRenderer.DrawScreenText( "Dipole Magnitude: " + std::to_string( dipole ), 10, 70, fbW, fbH );
+        textRenderer.DrawScreenText( "Adjustment Magnitude: " + std::to_string( atoms.latestCorrectionStrength ), 10, 90, fbW, fbH );
         textRenderer.DrawScreenText( "Single Bonds: " + std::to_string( atoms.singleBonds ), 10, 110, fbW, fbH );
         textRenderer.DrawScreenText( "Double Bonds: " + std::to_string( atoms.doubleBonds ), 10, 130, fbW, fbH );
         textRenderer.DrawScreenText( "Triple Bonds: " + std::to_string( atoms.tripleBonds ), 10, 150, fbW, fbH );

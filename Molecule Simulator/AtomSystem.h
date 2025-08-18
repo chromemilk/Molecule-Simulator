@@ -38,6 +38,8 @@ public:
 
     void computeLonePairDots();
 
+    bool hasHyrdogenBonds();
+
     void drawTooltip( const Atom &at, int w, int h ) const;
 
     void build( const std::vector<std::string> &symbols,
@@ -78,6 +80,10 @@ public:
 
 	float correctionProportion = 0.7f; // how much to correct the bond angles
 	float maxCorrectionPerStep = 15.0f; // max correction per step
+
+    bool hasLDF = false;
+    bool hasDDI = false;
+    bool hasHB = false;
 
     void clear();
 
