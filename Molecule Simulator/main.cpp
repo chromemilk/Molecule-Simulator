@@ -19,6 +19,78 @@
 
 #include <iostream>
 
+void setStyle() {
+    ImGuiStyle &style = ImGui::GetStyle();
+
+    
+
+    style.FrameBorderSize = 1.0f;
+    style.WindowBorderSize = 1.0f;
+    style.PopupBorderSize = 1.0f;
+    style.TabBorderSize = 0.0f;
+    style.WindowRounding = 8.0f;
+    style.ChildRounding = 8.0f;
+    style.FrameRounding = 8.0f;
+    style.PopupRounding = 8.0f;
+    style.ScrollbarRounding = 10.0f;
+    style.GrabRounding = 10.0f;
+    style.TabRounding = 8.0f;
+
+    ImVec4 bgWindow = ImVec4( 28 / 255.f, 28 / 255.f, 34 / 255.f, 0.90f );
+    ImVec4 bgChild = ImVec4( 38 / 255.f, 38 / 255.f, 48 / 255.f, 0.85f );
+    ImVec4 bgFrame = ImVec4( 48 / 255.f, 56 / 255.f, 72 / 255.f, 0.85f );
+    ImVec4 bgFrameHov = ImVec4( 68 / 255.f, 80 / 255.f, 104 / 255.f, 0.90f );
+    ImVec4 bgFrameAct = ImVec4( 58 / 255.f, 68 / 255.f, 92 / 255.f, 0.95f );
+    ImVec4 accent = ImVec4( 0 / 255.f, 122 / 255.f, 204 / 255.f, 0.90f );
+    ImVec4 accentHov = ImVec4( 0 / 255.f, 142 / 255.f, 224 / 255.f, 0.95f );
+    ImVec4 accentAct = ImVec4( 0 / 255.f, 102 / 255.f, 184 / 255.f, 1.00f );
+    ImVec4 textColor = ImVec4( 1, 1, 1, 1 );
+    ImVec4 borderCol = ImVec4( 64 / 255.f, 72 / 255.f, 88 / 255.f, 0.85f );
+
+    ImVec4 textDim = ImVec4( 0.78f, 0.80f, 0.86f, 1.0f );
+
+    auto &c = style.Colors;
+    c[ ImGuiCol_Text ] = textColor;
+    c[ ImGuiCol_WindowBg ] = bgWindow;
+    c[ ImGuiCol_ChildBg ] = bgChild;
+    c[ ImGuiCol_PopupBg ] = bgChild;
+    c[ ImGuiCol_Border ] = borderCol;
+    c[ ImGuiCol_BorderShadow ] = ImVec4( 0, 0, 0, 0.30f );
+
+    c[ ImGuiCol_FrameBg ] = bgFrame;
+    c[ ImGuiCol_FrameBgHovered ] = bgFrameHov;
+    c[ ImGuiCol_FrameBgActive ] = bgFrameAct;
+
+    c[ ImGuiCol_TitleBg ] = bgFrame;
+    c[ ImGuiCol_TitleBgActive ] = bgChild;
+    c[ ImGuiCol_MenuBarBg ] = bgChild;
+
+    c[ ImGuiCol_SliderGrab ] = accent;
+    c[ ImGuiCol_SliderGrabActive ] = accentAct;
+    c[ ImGuiCol_CheckMark ] = accent;
+
+    c[ ImGuiCol_Button ] = bgFrame;
+    c[ ImGuiCol_ButtonHovered ] = accentHov;
+    c[ ImGuiCol_ButtonActive ] = accentAct;
+
+    c[ ImGuiCol_Header ] = accent;
+    c[ ImGuiCol_HeaderHovered ] = accentHov;
+    c[ ImGuiCol_HeaderActive ] = accentAct;
+
+    c[ ImGuiCol_Tab ] = ImVec4( accent.x, accent.y, accent.z, 0.45f );
+    c[ ImGuiCol_TabHovered ] = accentHov;
+    c[ ImGuiCol_TabActive ] = accentAct;
+    c[ ImGuiCol_TabUnfocused ] = ImVec4( accent.x, accent.y, accent.z, 0.25f );
+    c[ ImGuiCol_TabUnfocusedActive ] = ImVec4( accent.x, accent.y, accent.z, 0.60f );
+
+    c[ ImGuiCol_TextSelectedBg ] = ImVec4( accent.x, accent.y, accent.z, 0.35f );
+    c[ ImGuiCol_NavHighlight ] = ImVec4( accent.x, accent.y, accent.z, 0.35f );
+
+    c[ ImGuiCol_Separator ] = borderCol;
+    c[ ImGuiCol_SeparatorHovered ] = accentHov;
+    c[ ImGuiCol_SeparatorActive ] = accentAct;
+}
+
 
 static Raytracer ray;          
 static bool useRT = false; // Dont use this 
@@ -55,9 +127,9 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL( window, true );
     ImGui_ImplOpenGL3_Init( "#version 460" );
 
-    Camera        camera( glm::vec3( 0, 0, 8 ) );
-    TextRenderer  textRenderer; textRenderer.Init();
-    AtomSystem    atoms( 100, textRenderer );
+    Camera camera( glm::vec3( 0, 0, 8 ) );
+    TextRenderer textRenderer; textRenderer.Init();
+    AtomSystem atoms( 20, textRenderer );
     Renderer::Init( &camera );
     ray.init();
 
@@ -87,6 +159,8 @@ int main() {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        setStyle();
         ShowImGuiMenu( ctx );
 
         glClearColor( 0.05f, 0.05f, 0.05f, 1.f );

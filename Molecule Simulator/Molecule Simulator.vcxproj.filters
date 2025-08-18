@@ -257,6 +257,9 @@
     <ClInclude Include="Tests.h">
       <Filter>Source Files\unit tests</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiHelpers.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="particle_vertex.glsl">

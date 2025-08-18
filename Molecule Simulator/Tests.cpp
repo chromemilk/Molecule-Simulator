@@ -114,8 +114,8 @@ return dbl == 3 && sing == 9;
         std::cout << "---- " << test.name << " ----\n";
         std::cout << "Input: " << test.formula << '\n';
 
-        bool   pass = false;
-        std::string  actual = "RUNTIME EXCEPTION";
+        bool pass = false;
+        std::string actual = "RUNTIME EXCEPTION";
 
         try
         {

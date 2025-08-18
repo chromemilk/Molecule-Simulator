@@ -76,8 +76,8 @@ public:
 
     std::string firstCentralGeometry;
 
-	float correctionProportion = 0.5f; // how much to correct the bond angles
-	float maxCorrectionPerStep = 10.0f; // max correction per step
+	float correctionProportion = 0.7f; // how much to correct the bond angles
+	float maxCorrectionPerStep = 15.0f; // max correction per step
 
     void clear();
 
