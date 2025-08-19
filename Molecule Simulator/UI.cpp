@@ -33,6 +33,85 @@ namespace
     void buildCNminus( InputContext &c ) {
         auto &s = *c.atoms; s.build( { "C","N" }, { {0,1,3} } ); c.currentPrebuiltAtom = "CN-";
     }
+
+    void buildO2( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "O","O" }, { {0,1,2} } ); c.currentPrebuiltAtom = "O2";
+    }
+    void buildN2( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "N","N" }, { {0,1,3} } ); c.currentPrebuiltAtom = "N2";
+    }
+    void buildH2( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "H","H" }, { {0,1,1} } ); c.currentPrebuiltAtom = "H2";
+    }
+    void buildCO( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "C","O" }, { {0,1,3} } ); c.currentPrebuiltAtom = "CO";
+    }
+    void buildHCl( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "H","Cl" }, { {0,1,1} } ); c.currentPrebuiltAtom = "HCl";
+    }
+    void buildHF( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "H","F" }, { {0,1,1} } ); c.currentPrebuiltAtom = "HF";
+    }
+    void buildSO2( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "O","S","O" }, { {1,0,2},{1,2,2} } ); c.currentPrebuiltAtom = "SO2";
+    }
+    void buildSO3( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "O","S","O","O" }, { {1,0,2},{1,2,2},{1,3,2} } ); c.currentPrebuiltAtom = "SO3";
+    }
+    void buildH2S( InputContext &c ) {
+        auto &s = *c.atoms; s.build( { "H","S","H" }, { {1,0,1},{1,2,1} } ); c.currentPrebuiltAtom = "H2S";
+    }
+    void buildNH4p( InputContext &c ) { // ammonium
+        auto &s = *c.atoms; s.build( { "N","H","H","H","H" }, { {0,1,1},{0,2,1},{0,3,1},{0,4,1} } ); c.currentPrebuiltAtom = "NH4+";
+    }
+    void buildNO3m( InputContext &c ) { // nitrate
+        auto &s = *c.atoms; s.build( { "O","N","O","O" }, { {1,0,2},{1,2,1},{1,3,1} } ); c.currentPrebuiltAtom = "NO3-";
+    }
+    void buildSO4m2( InputContext &c ) { // sulfate
+        auto &s = *c.atoms; s.build( { "O","S","O","O","O" }, { {1,0,2},{1,2,2},{1,3,1},{1,4,1} } ); c.currentPrebuiltAtom = "SO4^2-";
+    }
+    void buildHCO3m( InputContext &c ) { // bicarbonate
+        // Atoms: H(0), C(1), O(2)= (carbonyl), O(3)-H(4) (hydroxyl), O(5) (single)
+        auto &s = *c.atoms; s.build( { "H","C","O","O","H","O" },
+            { {1,2,2}, {1,3,1}, {3,4,1}, {1,5,1} } ); c.currentPrebuiltAtom = "HCO3-";
+    }
+    void buildCH3OH( InputContext &c ) { // methanol
+        // C(0)-O(1); C-H:2,3,4; O-H:5
+        auto &s = *c.atoms; s.build( { "C","O","H","H","H","H" },
+            { {0,1,1},{0,2,1},{0,3,1},{0,4,1},{1,5,1} } ); c.currentPrebuiltAtom = "CH3OH";
+    }
+    void buildC2H6( InputContext &c ) { // ethane
+        auto &s = *c.atoms; s.build( { "C","C","H","H","H","H","H","H" },
+            { {0,1,1},{0,2,1},{0,3,1},{0,4,1},{1,5,1},{1,6,1},{1,7,1} } ); c.currentPrebuiltAtom = "C2H6";
+    }
+    void buildC2H4( InputContext &c ) { // ethene
+        auto &s = *c.atoms; s.build( { "C","C","H","H","H","H" },
+            { {0,1,2},{0,2,1},{0,3,1},{1,4,1},{1,5,1} } ); c.currentPrebuiltAtom = "C2H4";
+    }
+    void buildC2H2( InputContext &c ) { // ethyne
+        auto &s = *c.atoms; s.build( { "C","C","H","H" },
+            { {0,1,3},{0,2,1},{1,3,1} } ); c.currentPrebuiltAtom = "C2H2";
+    }
+    void buildH2CO( InputContext &c ) { // formaldehyde
+        auto &s = *c.atoms; s.build( { "C","O","H","H" },
+            { {0,1,2},{0,2,1},{0,3,1} } ); c.currentPrebuiltAtom = "H2CO";
+    }
+    void buildHCOOH( InputContext &c ) { // formic acid (H-COOH)
+        // Atoms: H(0)-C(1)=O(2); C(1)-O(3)-H(4)
+        auto &s = *c.atoms; s.build( { "H","C","O","O","H" },
+            { {1,0,1},{1,2,2},{1,3,1},{3,4,1} } ); c.currentPrebuiltAtom = "HCOOH";
+    }
+    void buildC6H6( InputContext &c ) { // benzene (alternating double bonds)
+        // C ring 0..5, H 6..11
+        auto &s = *c.atoms; s.build(
+            { "C","C","C","C","C","C","H","H","H","H","H","H" },
+            {
+                {0,1,2},{1,2,1},{2,3,2},{3,4,1},{4,5,2},{5,0,1},
+                {0,6,1},{1,7,1},{2,8,1},{3,9,1},{4,10,1},{5,11,1}
+            }
+        );
+        c.currentPrebuiltAtom = "C6H6";
+    }
 }
 
 
@@ -107,30 +186,59 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
             ImGui::EndTabItem();
         }
-
         if (ImGui::BeginTabItem( "Prebuilt" ))
         {
             auto card = BeginCenteredCard( "Choose a Molecule", CARD_W );
             ImGui::Text( "Choose:" );
-            if (ImGui::Button( "H2O" ))  buildH2O( ctx );  ImGui::SameLine();
-            if (ImGui::Button( "CO2" ))  buildCO2( ctx );
 
-            if (ImGui::Button( "NH3" ))  buildNH3( ctx );  ImGui::SameLine();
-            if (ImGui::Button( "CH4" ))  buildCH4( ctx );
+            if (ImGui::BeginTable( "prebuilt_table", 4, ImGuiTableFlags_SizingStretchProp ))
+            {
+                auto addButton = [&]( const char *label, auto fn ) {
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button( label ))
+                        fn( ctx );
+                    };
 
-            if (ImGui::Button( "NO2-" )) buildNO2m( ctx ); ImGui::SameLine();
-            if (ImGui::Button( "HCN" ))  buildHCN( ctx );
+                addButton( "H2O", buildH2O );
+                addButton( "CO2", buildCO2 );
+                addButton( "NH3", buildNH3 );
+                addButton( "CH4", buildCH4 );
+                addButton( "NO2-", buildNO2m );
+                addButton( "HCN", buildHCN );
+                addButton( "O3", buildO3 );
+                addButton( "CN-", buildCNminus );
+                addButton( "O2", buildO2 );
+                addButton( "N2", buildN2 );
+                addButton( "H2", buildH2 );
+                addButton( "CO", buildCO );
+                addButton( "HCl", buildHCl );
+                addButton( "HF", buildHF );
+                addButton( "SO2", buildSO2 );
+                addButton( "SO3", buildSO3 );
+                addButton( "H2S", buildH2S );
+                addButton( "NH4+", buildNH4p );
+                addButton( "NO3-", buildNO3m );
+                addButton( "SO4^2-", buildSO4m2 );
+                addButton( "HCO3-", buildHCO3m );
+                addButton( "CH3OH", buildCH3OH );
+                addButton( "C2H6", buildC2H6 );
+                addButton( "C2H4", buildC2H4 );
+                addButton( "C2H2", buildC2H2 );
+                addButton( "H2CO", buildH2CO );
+                addButton( "HCOOH", buildHCOOH );
+                addButton( "C6H6", buildC6H6 );
 
-            if (ImGui::Button( "O3" ))   buildO3( ctx );   ImGui::SameLine();
-            if (ImGui::Button( "CN-" ))  buildCNminus( ctx );
+                ImGui::EndTable();
+            }
 
             ImGui::Separator();
             if (ImGui::Button( "Delete Molecule" ))
             {
-                atoms.clear(); ctx.currentPrebuiltAtom.clear();
+                atoms.clear();
+                ctx.currentPrebuiltAtom.clear();
             }
-            EndCenteredCard( card );
 
+            EndCenteredCard( card );
             ImGui::EndTabItem();
         }
 
