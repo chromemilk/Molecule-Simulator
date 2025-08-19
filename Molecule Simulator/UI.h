@@ -3,3 +3,5 @@
 
 
 void ShowImGuiMenu( InputContext &ctx );
+
+void ShowStatsOverlay( InputContext &ctx, float dipole, const std::string &forcesCSV );

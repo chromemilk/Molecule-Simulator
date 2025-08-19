@@ -12,6 +12,8 @@
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include "Resonance.h" 
+#include <imgui.h>
+
 
 
 
@@ -155,7 +157,18 @@ void AtomSystem::render( int w, int h, Atom *selectedAtom, Atom *hoveredAtom, At
 
     // Render computed geometry
     if (!firstCentralGeometry.empty()) {
-        textRenderer.DrawScreenText("Geometry: " + firstCentralGeometry, (w / 2) - 30, 30, w, h);
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_AlwaysAutoResize
+            | ImGuiWindowFlags_NoSavedSettings
+            | ImGuiWindowFlags_NoTitleBar;
+		std::string message = !firstCentralGeometry.empty() == true ? firstCentralGeometry : "No Molecule";
+        ImGui::SetNextWindowPos( ImVec2( (w / 2) - 30, 30 ), ImGuiCond_Always );
+        ImGui::Begin( "First Central Geometry", nullptr, flags );
+
+        ImGui::Text( "Geometry: %s", message );
+
+  
+        ImGui::End();
     }
 
     // Draw the relevant info for the active atom
@@ -968,47 +981,54 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
     const Element &e = PeriodicTable::Instance().Get( at.type );
 
     int ns = 0, nd = 0, nt = 0;
-	int piBonds = 0, sigmaBonds = 0;
+    int piBonds = 0, sigmaBonds = 0;
     for (const Bond &b : bonds)
+    {
         if (b.atomA == &at || b.atomB == &at)
         {
             if (b.type == BondType::SINGLE)
             {
-                ++ns;
-				++sigmaBonds;
+                ++ns; ++sigmaBonds;
             }
             if (b.type == BondType::DOUBLE)
             {
-                ++nd;
-				++sigmaBonds;
-				++piBonds;
+                ++nd; ++sigmaBonds; ++piBonds;
             }
             if (b.type == BondType::TRIPLE)
             {
-                ++nt;
-				++sigmaBonds;
-				piBonds += 2;
+                ++nt; ++sigmaBonds; piBonds += 2;
             }
         }
-
-    std::ostringstream os;
-    os << e.symbol << " (" << e.atomicNumber << ")  " << e.atomicMass << " u\n"
-        << "Electronegativity: " << e.electronegativity << "\n"
-        << "Dipole: " << glm::length( at.polarityDir ) << "\n"
-        << "Lone Pairs: " << at.lonePairs << "\n"
-        << "Bonds: " << at.bondedAtoms.size() << "\n";
-    if (ns) os << "  Single: " << ns << "\n";
-    if (nd) os << "  Double: " << nd << "\n";
-    if (nt) os << "  Triple: " << nt << "\n";
-	if (sigmaBonds) os << "  Sigma: " << sigmaBonds << "\n";
-	if (piBonds) os << "  Pi: " << piBonds << "\n";
-
-    float x = w - 150, y = 30, dy = 20;  int i = 0;  std::string ln;
-    std::istringstream iss( os.str() );
-    while (std::getline(iss, ln)) {
-        textRenderer.DrawScreenText(ln, x, y + i * dy, w, h), ++i;
     }
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
+        | ImGuiWindowFlags_AlwaysAutoResize
+        | ImGuiWindowFlags_NoSavedSettings
+        | ImGuiWindowFlags_NoTitleBar;
+
+    ImGui::SetNextWindowPos( ImVec2( (float)(w - 260), 20.0f ), ImGuiCond_Always );
+    if (ImGui::Begin( "AtomToolTip", nullptr, flags ))
+    {
+
+        ImGui::Text( "[%s]  Z=%d  %.3f u",
+            /* %s */ e.symbol.c_str(),
+            /* %d */ (int)e.atomicNumber,
+            /* %.3f */ (double)e.atomicMass );
+
+        ImGui::Text( "Electronegativity: %.3f", (double)e.electronegativity );
+
+        const float dipole = glm::length( at.polarityDir );
+        ImGui::Text( "Dipole: %.3f", dipole );
+
+        ImGui::Text( "Lone Pairs: %d", (int)at.lonePairs );
+
+        ImGui::Separator();
+        ImGui::Text( "Bonds  S:%d  D:%d  T:%d  (s:%d, pi:%d)",
+            ns, nd, nt, sigmaBonds, piBonds );
+    }
+    ImGui::End();
 }
+
 
 void AtomSystem::clear() {
     atoms.clear();

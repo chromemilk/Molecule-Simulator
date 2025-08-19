@@ -31,7 +31,7 @@ namespace
         auto &s = *c.atoms; s.build( { "O","O","O" }, { {0,1,2},{1,2,1} } ); c.currentPrebuiltAtom = "O3";
     }
     void buildCNminus( InputContext &c ) {
-        auto &s = *c.atoms; s.build( { "C","N" }, { {0,1,3} } );             c.currentPrebuiltAtom = "CN-";
+        auto &s = *c.atoms; s.build( { "C","N" }, { {0,1,3} } ); c.currentPrebuiltAtom = "CN-";
     }
 }
 
@@ -39,7 +39,7 @@ namespace
 void ShowImGuiMenu( InputContext &ctx ) {
     AtomSystem &atoms = *ctx.atoms;
 
-    if (!ImGui::Begin( "Molecule Menu" ))
+    if (!ImGui::Begin( "Molecule Menu", 0, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize ))
     {
         ImGui::End(); return;
     }
@@ -48,7 +48,6 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
     if (ImGui::BeginTabBar( "Tabs" ))
     {
-        // --- Main
         if (ImGui::BeginTabItem( "Main" ))
         {
             {
@@ -174,6 +173,54 @@ void ShowImGuiMenu( InputContext &ctx ) {
         }
 
         ImGui::EndTabBar();
+    }
+
+    ImGui::End();
+}
+
+void ShowStatsOverlay( InputContext &ctx, float dipole, const std::string &forcesCSV ) {
+    AtomSystem &atoms = *ctx.atoms;
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
+        | ImGuiWindowFlags_AlwaysAutoResize
+        | ImGuiWindowFlags_NoSavedSettings;
+
+    ImGui::SetNextWindowPos( ImVec2( 10, 10 ), ImGuiCond_Always );
+    ImGui::Begin( "Simulation Status", nullptr, flags );
+
+    const char *mol = ctx.currentPrebuiltAtom.empty() ? "(none)" : ctx.currentPrebuiltAtom.c_str();
+    ImGui::Text( "Molecule: %s", mol );
+    ImGui::Separator();
+
+    ImGui::Text( "Polarity: %s", atoms.isPolar ? "Polar" : "Non Polar" );
+
+    std::string forces = forcesCSV;
+    while (!forces.empty() && (forces.back() == ' ' || forces.back() == ',')) forces.pop_back();
+    if (forces.empty()) forces = "None";
+    ImGui::Text( "Forces: %s", forces.c_str() );
+    ImGui::Text( "Dipole Magnitude: %.4f", dipole );
+    ImGui::Text( "Adjustment Magnitude: %.3f", atoms.latestCorrectionStrength );
+
+    float stability = glm::clamp( 1.f - 0.5f * atoms.latestCorrectionStrength, 0.f, 1.f );
+    ImGui::Text( "Simulation Stability: %.0f%%", stability * 100.f );
+    ImGui::ProgressBar( stability, ImVec2( 240, 0.0f ) );
+
+    ImGui::Separator();
+    ImGui::TextDisabled( "WASD move | TAB for edit mode" );
+
+    ImGui::End();
+
+    ImGui::SetNextWindowPos( ImVec2( 280, 10 ), ImGuiCond_Always ); 
+    ImGui::Begin( "Bonds", nullptr, flags );
+
+    if (ImGui::BeginTable( "bonds_table", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg ))
+    {
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Single" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", atoms.singleBonds );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Double" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", atoms.doubleBonds );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Triple" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", atoms.tripleBonds );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Sigma" );  ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", atoms.sigmaBonds );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Pi" );     ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", atoms.piBonds );
+        ImGui::EndTable();
     }
 
     ImGui::End();
