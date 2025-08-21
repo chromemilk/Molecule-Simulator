@@ -5,6 +5,7 @@
 #include "tinyfiledialogs.h"
 #include "Tests.h"
 #include "ImGuiHelpers.h"
+#include <algorithm>
 using namespace CustomMenu;
 
 namespace
@@ -33,7 +34,6 @@ namespace
     void buildCNminus( InputContext &c ) {
         auto &s = *c.atoms; s.build( { "C","N" }, { {0,1,3} } ); c.currentPrebuiltAtom = "CN-";
     }
-
     void buildO2( InputContext &c ) {
         auto &s = *c.atoms; s.build( { "O","O" }, { {0,1,2} } ); c.currentPrebuiltAtom = "O2";
     }
@@ -114,6 +114,298 @@ namespace
     }
 }
 
+static std::vector<int> OldToHeavyFirst( const std::vector<std::string> &syms ) {
+    const int n = (int)syms.size();
+    int heavyCount = 0; for (auto &s : syms) if (s != "H") ++heavyCount;
+    std::vector<int> old2new( n, -1 );
+    int h = 0, k = heavyCount;
+    for (int i = 0; i < n; ++i)
+    {
+        if (syms[ i ] != "H") old2new[ i ] = h++;
+        else old2new[ i ] = k++;
+    }
+    return old2new;
+}
+
+static std::vector<std::tuple<int, int, int>> RemapBonds( const std::vector<std::tuple<int, int, int>> &bonds, const std::vector<int> &old2new ) {
+    std::vector<std::tuple<int, int, int>> out; out.reserve( bonds.size() );
+    for (auto [a, b, o] : bonds) out.emplace_back( old2new[ a ], old2new[ b ], o );
+    return out;
+}
+
+static std::vector<std::tuple<int, int, int>> Canon( const std::vector<std::tuple<int, int, int>> &bonds ) {
+    std::vector<std::tuple<int, int, int>> v; v.reserve( bonds.size() );
+    for (auto [a, b, o] : bonds)
+    {
+        if (a > b) std::swap( a, b );
+        v.emplace_back( a, b, o );
+    }
+    std::sort( v.begin(), v.end() );
+    return v;
+}
+
+
+static int ParseTrailingCharge( const std::string &s ) {
+    if (s.empty()) return 0;
+    int n = (int)s.size();
+    int sign = 0;
+    if (s[ n - 1 ] == '+') sign = +1; else if (s[ n - 1 ] == '-') sign = -1; else return 0;
+    int mag = 1;
+    if (n >= 3 && std::isdigit( (unsigned char)s[ n - 2 ] )) mag = s[ n - 2 ] - '0';
+    return sign * mag;
+}
+
+static std::vector<std::string> CollectSymbolsFromScene( const AtomSystem &atoms ) {
+    std::vector<std::string> syms; syms.reserve( atoms.getAtoms().size() );
+    for (const Atom &a : atoms.getAtoms()) syms.push_back( a.type );
+    return syms;
+}
+
+static std::vector<std::string> HeavyFirst( const std::vector<std::string> &syms ) {
+    std::vector<std::string> out; out.reserve( syms.size() );
+    for (const auto &s : syms) if (s != "H") out.push_back( s );
+    for (const auto &s : syms) if (s == "H") out.push_back( s );
+    return out;
+}
+
+static void DrawLewisMini( const std::vector<std::string> &symsHF,
+    const std::vector<std::tuple<int, int, int>> &bonds,
+    const ImVec2 &canvasSize,
+    float fontScale = 0.9f ) {
+    ImDrawList *dl = ImGui::GetWindowDrawList();
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p1 = ImVec2( p0.x + canvasSize.x, p0.y + canvasSize.y );
+    dl->AddRectFilled( p0, p1, IM_COL32( 30, 30, 38, 255 ), 8.0f );
+    dl->AddRect( p0, p1, IM_COL32( 60, 60, 70, 255 ), 8.0f );
+
+    const int N = (int)symsHF.size();
+    if (N == 0)
+    {
+        ImGui::Dummy( canvasSize ); return;
+    }
+
+    int heavyCnt = 0; for (auto &s : symsHF) if (s != "H") ++heavyCnt;
+
+    const float pad = 10.0f;
+    ImVec2 c = ImVec2( p0.x + canvasSize.x * 0.5f, p0.y + canvasSize.y * 0.52f );
+    float R = std::max( (canvasSize.x - 2 * pad), (canvasSize.y - 2 * pad) ) * 0.33f;
+    if (heavyCnt <= 2) R *= 0.75f;
+
+    std::vector<ImVec2> pos( N );
+
+    float a0 = -IM_PI * 0.5f;
+    for (int i = 0, k = 0; i < N; ++i)
+    {
+        if (symsHF[ i ] == "H") continue;
+        float ang = a0 + (heavyCnt ? (2.0f * IM_PI * (float)k / std::max( 1, heavyCnt )) : 0.0f);
+        pos[ i ] = ImVec2( c.x + R * cosf( ang ), c.y + R * sinf( ang ) );
+        ++k;
+    }
+
+    for (int hi = 0; hi < N; ++hi) if (symsHF[ hi ] == "H")
+    {
+        int neighbor = -1;
+        for (auto [a, b, o] : bonds)
+        {
+            if (a == hi && symsHF[ b ] != "H")
+            {
+                neighbor = b; break;
+            }
+            if (b == hi && symsHF[ a ] != "H")
+            {
+                neighbor = a; break;
+            }
+        }
+        if (neighbor >= 0)
+        {
+            ImVec2 rc = ImVec2( pos[ neighbor ].x - c.x, pos[ neighbor ].y - c.y );
+            float len = sqrtf( rc.x * rc.x + rc.y * rc.y );
+            ImVec2 dir = (len > 1e-3f) ? ImVec2( rc.x / len, rc.y / len ) : ImVec2( 0, -1 );
+            float rH = std::max( 10.0f, R * 0.45f );
+            pos[ hi ] = ImVec2( pos[ neighbor ].x + dir.x * rH, pos[ neighbor ].y + dir.y * rH );
+        }
+        else
+        {
+            pos[ hi ] = ImVec2( c.x, c.y - R * 0.6f );
+        }
+    }
+
+    auto drawBond = [&]( int a, int b, int order ) {
+        ImVec2 A = pos[ a ], B = pos[ b ];
+        ImVec2 v = ImVec2( B.x - A.x, B.y - A.y );
+        float L = sqrtf( v.x * v.x + v.y * v.y ); if (L < 1e-3f) return;
+        ImVec2 u = ImVec2( v.x / L, v.y / L );
+        ImVec2 n = ImVec2( -u.y, u.x );
+        float gapA = (symsHF[ a ] == "H") ? 6.0f : 9.0f;
+        float gapB = (symsHF[ b ] == "H") ? 6.0f : 9.0f;
+        ImVec2 A2 = ImVec2( A.x + u.x * gapA, A.y + u.y * gapA );
+        ImVec2 B2 = ImVec2( B.x - u.x * gapB, B.y - u.y * gapB );
+        float off = 3.0f, thick = 2.0f;
+        if (order == 1)
+        {
+            dl->AddLine( A2, B2, IM_COL32( 220, 220, 220, 255 ), thick );
+        }
+        else if (order == 2)
+        {
+            dl->AddLine( ImVec2( A2.x + n.x * off, A2.y + n.y * off ), ImVec2( B2.x + n.x * off, B2.y + n.y * off ), IM_COL32( 220, 220, 220, 255 ), thick );
+            dl->AddLine( ImVec2( A2.x - n.x * off, A2.y - n.y * off ), ImVec2( B2.x - n.x * off, B2.y - n.y * off ), IM_COL32( 220, 220, 220, 255 ), thick );
+        }
+        else if (order == 3)
+        {
+            dl->AddLine( A2, B2, IM_COL32( 220, 220, 220, 255 ), thick );
+            dl->AddLine( ImVec2( A2.x + n.x * 2.0f * off, A2.y + n.y * 2.0f * off ), ImVec2( B2.x + n.x * 2.0f * off, B2.y + n.y * 2.0f * off ), IM_COL32( 220, 220, 220, 255 ), thick );
+            dl->AddLine( ImVec2( A2.x - n.x * 2.0f * off, A2.y - n.y * 2.0f * off ), ImVec2( B2.x - n.x * 2.0f * off, B2.y - n.y * 2.0f * off ), IM_COL32( 220, 220, 220, 255 ), thick );
+        }
+        };
+    for (auto [a, b, o] : bonds) drawBond( a, b, o );
+
+    ImGui::PushClipRect( p0, p1, true );
+    float fs = ImGui::GetFontSize() * fontScale;
+    for (int i = 0; i < N; ++i)
+    {
+        ImVec2 t = pos[ i ];
+        std::string lab = symsHF[ i ];
+        ImVec2 ts = ImGui::CalcTextSize( lab.c_str() );
+        dl->AddText( ImVec2( t.x - ts.x * 0.5f, t.y - ts.y * 0.5f ), IM_COL32( 255, 255, 255, 255 ), lab.c_str() );
+    }
+    ImGui::PopClipRect();
+
+    ImGui::Dummy( canvasSize );
+}
+
+
+static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
+    AtomSystem &atoms = *ctx.atoms;
+
+    auto card = BeginCenteredCard( "Resonance structures", CARD_W );
+
+    static bool enabled = true;
+    CustomMenu::CustomCheckbox( "Enable resonance", &enabled );
+	ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    if (!enabled)
+    {
+        EndCenteredCard( card ); ImGui::EndTabItem(); return;
+    }
+
+    static float topK = 6; if (topK < 1) topK = 1; if (topK > 36) topK = 36;
+    CustomMenu::CustomSliderFloat( "Top K", ImGuiDataType_Float, &topK, 1, 6, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 220 );
+
+    static float netCharge = 0; 
+    if (ctx.currentPrebuiltAtom.size() && ImGui::IsWindowAppearing())
+    {
+        netCharge = ParseTrailingCharge( ctx.currentPrebuiltAtom );
+    }
+    CustomMenu::CustomSliderFloat( "Net charge", ImGuiDataType_Float, &netCharge, -4, +4, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 220 );
+
+    ImGui::Separator();
+    std::vector<std::string> syms = CollectSymbolsFromScene( atoms );
+    if (syms.empty())
+    {
+        ImGui::TextDisabled( "No molecule in the scene." );
+        EndCenteredCard( card );
+        ImGui::EndTabItem();
+        return;
+    }
+
+    static std::string cachedKey;
+    static std::vector<std::vector<std::tuple<int, int, int>>> cached;
+
+    auto sig = [&]( const std::vector<std::string> &S ) {
+        std::string k; k.reserve( S.size() * 3 );
+        for (auto &s : S)
+        {
+            k += s; k += ',';
+        }
+        return k;
+        };
+    static std::string lastLabel, lastSymsSig;
+    std::string symsSig = sig( syms );
+    if (ctx.currentPrebuiltAtom != lastLabel || symsSig != lastSymsSig)
+    {
+        int parsed = ParseTrailingCharge( ctx.currentPrebuiltAtom );
+        if (ctx.currentPrebuiltAtom.find( '+' ) != std::string::npos ||
+            ctx.currentPrebuiltAtom.find( '-' ) != std::string::npos)
+        {
+            netCharge = parsed;
+        }
+        lastLabel = ctx.currentPrebuiltAtom;
+        lastSymsSig = symsSig;
+        cachedKey.clear();
+    }
+
+    const std::string key = symsSig + "|Q=" + std::to_string( netCharge );
+    bool doGen = (key != cachedKey) || ImGui::Button( "Generate / Refresh" );
+    if (doGen)
+    {
+        cachedKey = key;
+        cached.clear();
+        try
+        {
+            Resonance::Generator gen( syms, netCharge );
+            auto allOrig = gen.generateStructuresOriginal();
+            cached = allOrig;
+
+            auto Canonize = []( const std::vector<std::tuple<int, int, int>> &bonds ) {
+                std::vector<std::tuple<int, int, int>> v; v.reserve( bonds.size() );
+                for (auto [a, b, o] : bonds)
+                {
+                    if (a > b) std::swap( a, b ); v.emplace_back( a, b, o );
+                }
+                std::sort( v.begin(), v.end() );
+                return v;
+                };
+            auto bestOrig = gen.bestStructure();
+            auto bestC = Canonize( bestOrig );
+            int bestIdx = -1;
+            for (int i = 0; i < (int)cached.size(); ++i)
+                if (Canonize( cached[ i ] ) == bestC)
+                {
+                    bestIdx = i; break;
+                }
+            if (bestIdx > 0) std::rotate( cached.begin(), cached.begin() + bestIdx, cached.begin() + bestIdx + 1 );
+        }
+        catch (const std::exception &e)
+        {
+            ImGui::TextColored( ImVec4( 1, 0.5f, 0.5f, 1 ), "Resonance generation failed: %s", e.what() );
+        }
+    }
+
+    if (cached.empty())
+    {
+        ImGui::TextDisabled( "No valid resonance structures for this molecule/charge." );
+        EndCenteredCard( card );
+        ImGui::EndTabItem();
+        return;
+    }
+
+    const int cols = 3;
+    if (ImGui::BeginTable( "res_k_table", cols, ImGuiTableFlags_SizingStretchProp ))
+    {
+        const int showN = std::min<int>( topK, (int)cached.size() );
+        for (int i = 0; i < showN; ++i)
+        {
+            if (i % cols == 0) ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::PushID( i );
+            ImVec2 cell = ImVec2( (CARD_W - 24.0f) / cols, (CARD_W - 24.0f) / cols );
+            ImGui::BeginChild( "mini", cell, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse );
+            DrawLewisMini( syms, cached[ i ], ImVec2( cell.x - 8.0f, cell.y - 28.0f ) );
+            ImGui::Text( "%d", i + 1 );
+            ImGui::EndChild();
+            if (ImGui::IsItemClicked()) atoms.build( syms, cached[ i ] );
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+
+    EndCenteredCard( card );
+    ImGui::EndTabItem();
+}
+
 
 void ShowImGuiMenu( InputContext &ctx ) {
     AtomSystem &atoms = *ctx.atoms;
@@ -175,9 +467,9 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
             {
                 auto card = BeginCenteredCard( "VSEPR/Resonance Options", CARD_W );
-                CustomMenu::CustomCheckbox( "Central Only Bonding", &Resonance::centralOnlyBonding );
+                CustomMenu::CustomCheckbox( "Single Central Atom Mode", &Resonance::centralOnlyBonding );
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip( "Enable this for molecules with one central atom for performance when using the automatic resonance generator." );
+                    ImGui::SetTooltip( "Enable this for molecules with only one central bonding atom for performance when using the automatic resonance generator." );
                 CustomMenu::CustomCheckbox( "Apply VSEPR Forces", &atoms.applyVESPR );
                 if (atoms.applyVESPR)
                     CustomMenu::CustomCheckbox( "Large-molecule VSEPR", &atoms.fastCorrection );
@@ -186,6 +478,13 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
             ImGui::EndTabItem();
         }
+
+        if (ImGui::BeginTabItem( "Resonance" ))
+        {
+            ShowResonanceTab( ctx, CARD_W );
+        }
+
+
         if (ImGui::BeginTabItem( "Prebuilt" ))
         {
             auto card = BeginCenteredCard( "Choose a Molecule", CARD_W );

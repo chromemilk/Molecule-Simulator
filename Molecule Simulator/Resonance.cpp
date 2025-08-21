@@ -17,7 +17,27 @@ using std::uint8_t;
 namespace Resonance
 {
 
+    static inline std::vector<std::tuple<int, int, int>> MapBondsToOld( const std::vector<std::tuple<int, int, int>> &b,
+            const std::vector<int> &n2o ) {
+        std::vector<std::tuple<int, int, int>> out; out.reserve( b.size() );
+        for (auto t : b)
+        {
+            int a, b2, o; std::tie( a, b2, o ) = t;
+            out.emplace_back( n2o[ a ], n2o[ b2 ], o );
+        }
+        return out;
+    }
 
+    const std::vector<int> &Generator::new2oldMap() const {
+        return new2old;
+    }
+
+    std::vector<std::vector<std::tuple<int, int, int>>> Generator::generateStructuresOriginal() {
+        auto internal = generateStructures();                // current internal list
+        std::vector<std::vector<std::tuple<int, int, int>>> out; out.reserve( internal.size() );
+        for (auto &v : internal) out.push_back( MapBondsToOld( v, new2old ) );
+        return out;
+    }
 
     static string stripCharge( string s ) {
         if (!s.empty() && (s.back() == '+' || s.back() == '-'))
@@ -176,32 +196,76 @@ namespace Resonance
     }
 
 
-    Generator::Generator( const vector<string> &atoms, int nc ) : targetCharge(nc) {
-        const int n = atoms.size();
-        new2old.reserve( n );   symbols.reserve( n );
+    Generator::Generator( const std::vector<std::string> &atoms, int nc )
+        : targetCharge( nc ) {
+        const int n = (int)atoms.size();
+        new2old.reserve( n );
+        symbols.reserve( n );
 
         for (int i = 0; i < n; ++i) if (atoms[ i ] != "H")
         {
-            new2old.push_back( i ); symbols.push_back( atoms[ i ] );
+            new2old.push_back( i );
+            symbols.push_back( atoms[ i ] );
         }
-        heavyCnt = symbols.size();
+        heavyCnt = (int)symbols.size();
         for (int i = 0; i < n; ++i) if (atoms[ i ] == "H")
         {
-            new2old.push_back( i ); symbols.push_back( "H" );
+            new2old.push_back( i );
+            symbols.push_back( "H" );
+        }
+
+    
+        if (heavyCnt >= 3)
+        {
+            auto &pt = PeriodicTable::Instance();
+
+            auto countBase = [&]( const std::string &base ) {
+                int c = 0;
+                for (int i = 0; i < heavyCnt; ++i)
+                    if (stripCharge( symbols[ i ] ) == base) ++c;
+                return c;
+                };
+
+            auto score = [&]( int i ) {
+                const std::string base = stripCharge( symbols[ i ] );
+                const uint8_t tv = typicalValence( symbols[ i ] );   // includes charge effects
+                const uint8_t mv = maxValenceFor( base );
+                const float en = pt.Get( base ).electronegativity;
+
+                int s = 0;
+                s += 3 * int( tv );
+                s += int( mv );
+                if (countBase( base ) == 1) s += 2;                 
+                if (base == "C") s += 1;                           // carbon often central
+                if (base == "O") s -= 2;                           // O tends to be terminal
+                if (base == "F" || base == "Cl" || base == "Br" || base == "I") s -= 3; // halogens terminal
+                s -= int( en * 10.0f );                              // prefer less EN
+                return s;
+                };
+
+            int best = 0;
+            for (int i = 1; i < heavyCnt; ++i)
+                if (score( i ) > score( best )) best = i;
+
+            if (best != 0)
+            {
+                std::swap( symbols[ 0 ], symbols[ best ] );
+                std::swap( new2old[ 0 ], new2old[ best ] );
+            }
         }
 
         old2new.resize( n );
-        for (int k = 0; k < n; ++k) old2new[ new2old[ k ] ] = k;
+        for (int k = 0; k < n; ++k)
+            old2new[ new2old[ k ] ] = k;
 
         auto &pt = PeriodicTable::Instance();
         for (const auto &sym : symbols)
         {
-            string base = sym;
+            std::string base = sym;
             if (!base.empty() && (base.back() == '+' || base.back() == '-'))
             {
                 base.pop_back();
-                if (!base.empty() && ::isdigit( base.back() ))
-                    base.pop_back();
+                if (!base.empty() && ::isdigit( base.back() )) base.pop_back();
             }
             try
             {

@@ -21,15 +21,15 @@ struct CardScope
 struct CenterCard
 {
     ImDrawList *dl = nullptr;
-    ImVec2      frame_min{};
-    ImVec2      frame_max{};
-    float       card_w = 0.0f;
-    float       pad_x = 7.0f;   
-    float       pad_y = 2.0f;  
-    float       rounding = 10.0f;
-    ImU32       bg_col = 0;
-    ImU32       border_col = 0;
-    bool        with_header = true;
+    ImVec2 frame_min{};
+    ImVec2 frame_max{};
+    float card_w = 0.0f;
+    float pad_x = 7.0f;   
+    float pad_y = 2.0f;  
+    float rounding = 10.0f;
+    ImU32 bg_col = 0;
+    ImU32 border_col = 0;
+    bool with_header = true;
 };
 
 

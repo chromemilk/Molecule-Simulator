@@ -37,6 +37,9 @@ namespace Resonance {
         std::vector<Bond>  bestStructure();
         bool hypervalent( const std::vector<Bond> & ) const;
 
+        const std::vector<int> &new2oldMap() const;  
+        std::vector<std::vector<std::tuple<int, int, int>>> generateStructuresOriginal();
+
     private:
         SearchCaps caps_;
         int nodesVisited_ = 0;
