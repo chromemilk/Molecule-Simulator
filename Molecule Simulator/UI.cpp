@@ -406,10 +406,13 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
     static float maxNodes = 75000.0f;
     static float maxStructs = 192.0f;
     ImGui::Text( "Resonance Search" );
-    ImGui::Spacing();
     ImGui::RadioButton( "Fast", &searchLevel, (int)Resonance::SearchCaps::Fast ); ImGui::SameLine();
     ImGui::RadioButton( "Balanced", &searchLevel, (int)Resonance::SearchCaps::Balanced ); ImGui::SameLine();
     ImGui::RadioButton( "Exhaustive", &searchLevel, (int)Resonance::SearchCaps::Exhaustive );
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
     CustomMenu::CustomSliderFloat( "Max nodes", ImGuiDataType_Float, &maxNodes, 10000, 300000, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 240 );
     CustomMenu::CustomSliderFloat( "Max structures", ImGuiDataType_Float, &maxStructs, 32, 1024, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 240 );
 
@@ -600,11 +603,23 @@ void ShowImGuiMenu( InputContext &ctx ) {
                 ImGui::InputText( "##2", formula, sizeof( formula ) );
                 if (ImGui::Button( "Generate (automatic resonance)" ) && formula[ 0 ])
                 {
-                    ParsedFormula pf = parseFormulaFull( formula );
-                    Resonance::Generator gen( pf.atoms, pf.charge );
-                    atoms.build( pf.atoms, gen.bestStructure() );
-                    ctx.currentPrebuiltAtom = formula;
-                    formula[ 0 ] = '\0';
+                    try
+                    {
+                        ParsedFormula pf = parseFormulaFull( formula );
+                        Resonance::Generator gen( pf.atoms, pf.charge );
+                        atoms.build( pf.atoms, gen.bestStructure() );
+                        ctx.currentPrebuiltAtom = formula;
+                        formula[ 0 ] = '\0';
+                    }
+                    catch (const std::exception &e)
+                    {
+                        tinyfd_messageBox(
+                            "Molecule generation failed",
+                            e.what(),
+                            "ok",
+                            "error",
+                            1 );
+                    }
                 }
 
                 ImGui::Separator();
