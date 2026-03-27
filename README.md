@@ -13,6 +13,10 @@ A real-time 3D molecular structure and dynamics simulator written in modern C++1
 * [Building & Running](#building--running)
 * [Planned Features](#planned-features)
 * [Future Ideas](#future-ideas)
+
+https://github.com/user-attachments/assets/4c46024b-c0af-442c-bb21-6fc3e0394bcf
+
+
 * [License](#license)
 * [Acknowledgements](#acknowledgements)
 
