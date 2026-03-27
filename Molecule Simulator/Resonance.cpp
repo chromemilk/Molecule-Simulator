@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <functional>
+#include <unordered_set>
 
 using std::vector;
 using std::string;
@@ -16,6 +17,57 @@ using std::uint8_t;
 
 namespace Resonance
 {
+    static bool heavyConnected( const std::vector<std::tuple<int, int, int>> &mol, int heavyCnt ) {
+        if (heavyCnt <= 1) return true;
+        std::vector<std::vector<int>> adj( heavyCnt );
+        for (auto [i, j, o] : mol)
+        {
+            if (o <= 0) continue;
+            if (i < heavyCnt && j < heavyCnt)
+            {
+                adj[ i ].push_back( j );
+                adj[ j ].push_back( i );
+            }
+        }
+        std::vector<char> seen( heavyCnt, 0 );
+        std::vector<int> st = { 0 };
+        seen[ 0 ] = 1;
+        while (!st.empty())
+        {
+            int u = st.back(); st.pop_back();
+            for (int v : adj[ u ]) if (!seen[ v ])
+            {
+                seen[ v ] = 1;
+                st.push_back( v );
+            }
+        }
+        return std::all_of( seen.begin(), seen.end(), []( char f ) { return f != 0; } );
+    }
+
+    static std::string canonicalBondKey( const std::vector<std::tuple<int, int, int>> &bonds ) {
+        std::vector<std::tuple<int, int, int>> v;
+        v.reserve( bonds.size() );
+        for (auto [a, b, o] : bonds)
+        {
+            if (a > b) std::swap( a, b );
+            v.emplace_back( a, b, o );
+        }
+        std::sort( v.begin(), v.end() );
+
+        std::string key;
+        key.reserve( v.size() * 8 );
+        for (auto [a, b, o] : v)
+        {
+            key += std::to_string( a );
+            key.push_back( '-' );
+            key += std::to_string( b );
+            key.push_back( ':' );
+            key += std::to_string( o );
+            key.push_back( ';' );
+        }
+        return key;
+    }
+
 
     static inline std::vector<std::tuple<int, int, int>> MapBondsToOld( const std::vector<std::tuple<int, int, int>> &b,
             const std::vector<int> &n2o ) {
@@ -30,6 +82,18 @@ namespace Resonance
 
     const std::vector<int> &Generator::new2oldMap() const {
         return new2old;
+    }
+
+    void Generator::setSearchCaps( const SearchCaps &caps ) {
+        caps_ = caps;
+    }
+
+    SearchCaps Generator::searchCaps() const {
+        return caps_;
+    }
+
+    int Generator::nodesVisited() const {
+        return nodesVisited_;
     }
 
     std::vector<std::vector<std::tuple<int, int, int>>> Generator::generateStructuresOriginal() {
@@ -107,6 +171,25 @@ namespace Resonance
         if (base == "Cl" || base == "Br" || base == "I" || base == "At" || base == "Ts")
             return 7;                       // halogens may expand up to seven bonds
         return 6;                            // general upper bound for others
+    }
+
+    static int desiredElectronTarget( const std::string &base ) {
+        if (base == "H") return 2;
+        if (base == "B" || base == "Al" || base == "Ga" || base == "In" || base == "Tl") return 6;
+        if (base == "P" || base == "S" || base == "Cl" || base == "Br" || base == "I"
+            || base == "Se" || base == "Te" || base == "As" || base == "Sb" || base == "Xe") return 12;
+        return 8;
+    }
+
+    static int maxBondOrderForPair( const std::string &a, const std::string &b ) {
+        static const std::unordered_set<std::string> kMayUseQuad = {
+            "Cr","Mo","W","Re","Ru","Rh","Os","Ir","Fe","Co","Ni"
+        };
+
+        const std::string A = stripCharge( a );
+        const std::string B = stripCharge( b );
+        if (kMayUseQuad.count( A ) || kMayUseQuad.count( B )) return 4;
+        return 3;
     }
 
     static vector<uint8_t> valenceOptions( const string &sym ) {
@@ -276,6 +359,25 @@ namespace Resonance
                 throw std::invalid_argument( "Unknown element symbol: " + sym );
             }
         }
+
+        if (heavyCnt >= 10)
+        {
+            caps_.level = SearchCaps::Fast;
+            caps_.maxNodes = 25000;
+            caps_.maxStructures = 96;
+        }
+        else if (heavyCnt >= 7)
+        {
+            caps_.level = SearchCaps::Balanced;
+            caps_.maxNodes = 75000;
+            caps_.maxStructures = 192;
+        }
+        else
+        {
+            caps_.level = SearchCaps::Exhaustive;
+            caps_.maxNodes = 220000;
+            caps_.maxStructures = 512;
+        }
     }
 
     int Generator::netCharge( const std::vector<Bond> &bonds ) const {
@@ -292,7 +394,7 @@ namespace Resonance
         for (int i = 0; i < n; ++i)
         {
             std::string base = stripCharge( symbols[ i ] );
-            int desired = (base == "H") ? 2 : 8;
+            int desired = desiredElectronTarget( base );
 
             int ve = pt.Get( base ).valenceElectrons;
             int bondsOwn = bondSum[ i ];
@@ -372,7 +474,7 @@ namespace Resonance
         for (int i = 0; i < n; ++i)
         {
             std::string base = stripCharge( symbols[ i ] );
-            int desired = (base == "H") ? 2 : 8;
+            int desired = desiredElectronTarget( base );
 
             int ve = pt.Get( base ).valenceElectrons;          // valence electrons
             int bondsOwn = bondSum[ i ];                             // B/2  (one e- per bond)
@@ -389,16 +491,21 @@ namespace Resonance
         std::vector<Bond> &current,
         int &bestCharge,
         std::vector<std::vector<Bond>> &bag ) {
+        if (++nodesVisited_ > caps_.maxNodes)
+            return;
+
         if (next == heavyCnt)
         {
             if (netCharge( current ) != targetCharge || hypervalent( current )) return;
+            if (!heavyConnected( current, heavyCnt )) return;
 
             int fc = formalCharge( current );
             if (fc < bestCharge)
             {
                 bestCharge = fc; bag.clear();
             }
-            if (fc == bestCharge) bag.push_back( current );
+            if (fc == bestCharge && static_cast<int>( bag.size() ) < caps_.maxStructures)
+                bag.push_back( current );
             return;
         }
 
@@ -423,7 +530,7 @@ namespace Resonance
                     return;
                 }
 
-                int maxOrder = std::min<int>( 3, std::min( valLeft[ prev ], valLeft[ next ] ) );
+                int maxOrder = std::min<int>( maxBondOrderForPair( symbols[ prev ], symbols[ next ] ), std::min( valLeft[ prev ], valLeft[ next ] ) );
                 while (maxOrder >= 1 && (exceedsLimit( prev, maxOrder ) || exceedsLimit( next, maxOrder )))
                     --maxOrder;
 
@@ -452,6 +559,7 @@ namespace Resonance
 
     vector<vector<Bond>> Generator::generateStructures() {
         vector<vector<Bond>> all;
+        nodesVisited_ = 0;
 
         if (heavyCnt == 0)
         {
@@ -495,6 +603,17 @@ namespace Resonance
                 }
             };
         back( 0 );
+
+        std::unordered_set<std::string> seen;
+        vector<vector<Bond>> dedup;
+        dedup.reserve( all.size() );
+        for (const auto &m : all)
+        {
+            std::string key = canonicalBondKey( m );
+            if (seen.insert( key ).second)
+                dedup.push_back( m );
+        }
+        all.swap( dedup );
         return all;
     }
 
@@ -534,7 +653,8 @@ namespace Resonance
         std::vector<const std::vector<Bond> *> legal;
         for (const auto &m : all)
             if (netCharge( m ) == targetCharge      /* exact charge     */
-                && !hypervalent( m ))                 /* octet preserved  */
+                && !hypervalent( m )
+                && heavyConnected( m, heavyCnt ))
                 legal.push_back( &m );
 
         if (legal.empty())
@@ -570,6 +690,28 @@ namespace Resonance
                 int typDev = 0;
                 for (std::size_t k = 0; k < symbols.size(); ++k)
                     typDev += std::abs( bondSum[ k ] - typicalValence( symbols[ k ] ) );
+
+                int octetPenalty = 0;
+                int chargePlacementPenalty = 0;
+                for (std::size_t k = 0; k < symbols.size(); ++k)
+                {
+                    const std::string base = stripCharge( symbols[ k ] );
+                    const auto &elem = PeriodicTable::Instance().Get( base );
+                    const int desired = desiredElectronTarget( base );
+                    const int lone = std::max( 0, desired - 2 * bondSum[ k ] );
+                    const int owned = bondSum[ k ] + lone;
+                    const int fcSigned = elem.valenceElectrons - owned;
+
+                    if (elem.atomicNumber <= 10)
+                    {
+                        const int targetOwned = (base == "H") ? 2 : 8;
+                        octetPenalty += std::abs( owned - targetOwned );
+                    }
+
+                    const int enScaled = int( elem.electronegativity * 10.0f );
+                    if (fcSigned < 0) chargePlacementPenalty += std::max( 0, 32 - enScaled );
+                    if (fcSigned > 0) chargePlacementPenalty += std::max( 0, enScaled - 20 );
+                }
 
                 int over = 0; for (auto [i, j, o] : mol) over += (o - 1) * (o - 1);
 
@@ -613,7 +755,7 @@ namespace Resonance
                 // desired electron count (octet/expanded) for estimating available lone pairs
                 auto &pt = PeriodicTable::Instance();
                 auto desiredE = [&]( int idx ) {
-                    return symbols[ idx ] == "H" ? 2 : 8;
+                    return desiredElectronTarget( stripCharge( symbols[ idx ] ) );
                     };
 
                 std::vector<int> loneE( symbols.size(), 0 );
@@ -692,6 +834,8 @@ namespace Resonance
                 }
 
                 int cyclePenalty = std::max( 0, cycl - aromaticAllowed );
+                if (cycl > 0 && cyclePenalty > 0 && cycl <= 2)
+                    --cyclePenalty; // keep simple non-aromatic rings viable
 
                 int conn = (int)mol.size();
 
@@ -700,6 +844,8 @@ namespace Resonance
                 return std::tuple{
                     comps,          // connected heavy graph
                     cyclePenalty,   // penalize non-aromatic cycles
+                    octetPenalty,   // enforce octet quality on 2nd-row atoms
+                    chargePlacementPenalty, // prefer chemically plausible charge location
                     absFC,          // minimize total |formal charge|
                     typDev,         // near-typical valences
                     over,           // avoid unnecessary multiple bonds

@@ -2,10 +2,12 @@
 #include <glm/glm.hpp>
 #include "Parser.h"
 #include "resonance.h"
+#include "PeriodicTable.h"
 #include "tinyfiledialogs.h"
 #include "Tests.h"
 #include "ImGuiHelpers.h"
 #include <algorithm>
+#include <queue>
 using namespace CustomMenu;
 
 namespace
@@ -188,7 +190,8 @@ static void DrawLewisMini( const std::vector<std::string> &symsHF,
 
     const float pad = 10.0f;
     ImVec2 c = ImVec2( p0.x + canvasSize.x * 0.5f, p0.y + canvasSize.y * 0.52f );
-    float R = std::max( (canvasSize.x - 2 * pad), (canvasSize.y - 2 * pad) ) * 0.33f;
+    float R = std::min( (canvasSize.x - 2 * pad), (canvasSize.y - 2 * pad) ) * 0.38f;
+    R = std::max( 26.0f, R );
     if (heavyCnt <= 2) R *= 0.75f;
 
     std::vector<ImVec2> pos( N );
@@ -273,6 +276,111 @@ static void DrawLewisMini( const std::vector<std::string> &symsHF,
     ImGui::Dummy( canvasSize );
 }
 
+struct ResonanceDiagnostics
+{
+    int absFormalCharge = 0;
+    int components = 0;
+    int heavyComponents = 0;
+    int heavyRings = 0;
+    int octetPenalty = 0;
+    int chargePlacementPenalty = 0;
+    int multibondPenalty = 0;
+};
+
+static int desiredElectronsForUI( const std::string &s ) {
+    if (s == "H") return 2;
+    if (s == "B" || s == "Al" || s == "Ga" || s == "In" || s == "Tl") return 6;
+    if (s == "P" || s == "S" || s == "Cl" || s == "Br" || s == "I"
+        || s == "Se" || s == "Te" || s == "As" || s == "Sb" || s == "Xe") return 12;
+    return 8;
+}
+
+static ResonanceDiagnostics AnalyzeResonanceStructure(
+    const std::vector<std::string> &syms,
+    const std::vector<std::tuple<int, int, int>> &bonds ) {
+    ResonanceDiagnostics d;
+    const int n = (int)syms.size();
+    if (n == 0) return d;
+
+    std::vector<int> bondSum( n, 0 );
+    std::vector<char> isHeavy( n, 0 );
+    std::vector<std::vector<std::pair<int, int>>> adj( n );
+    int heavyAtoms = 0;
+    int heavyEdges = 0;
+
+    for (int i = 0; i < n; ++i)
+    {
+        isHeavy[ i ] = (syms[ i ] != "H");
+        if (isHeavy[ i ]) ++heavyAtoms;
+    }
+
+    for (auto [a, b, o] : bonds)
+    {
+        if (a < 0 || b < 0 || a >= n || b >= n) continue;
+        bondSum[ a ] += o;
+        bondSum[ b ] += o;
+        adj[ a ].push_back( { b, o } );
+        adj[ b ].push_back( { a, o } );
+        d.multibondPenalty += (o - 1) * (o - 1);
+        if (isHeavy[ a ] && isHeavy[ b ]) ++heavyEdges;
+    }
+
+    auto countComps = [&]( bool heavyOnly ) {
+        std::vector<char> seen( n, 0 );
+        int comps = 0;
+        for (int s = 0; s < n; ++s)
+        {
+            if (seen[ s ]) continue;
+            if (heavyOnly && !isHeavy[ s ]) continue;
+            std::queue<int> q;
+            q.push( s );
+            seen[ s ] = 1;
+            ++comps;
+            while (!q.empty())
+            {
+                int u = q.front(); q.pop();
+                for (auto [v, _] : adj[ u ])
+                {
+                    if (heavyOnly && !isHeavy[ v ]) continue;
+                    if (!seen[ v ])
+                    {
+                        seen[ v ] = 1;
+                        q.push( v );
+                    }
+                }
+            }
+        }
+        return comps;
+        };
+
+    d.components = countComps( false );
+    d.heavyComponents = (heavyAtoms > 0) ? countComps( true ) : 0;
+    d.heavyRings = std::max( 0, heavyEdges - heavyAtoms + d.heavyComponents );
+
+    for (int i = 0; i < n; ++i)
+    {
+        const std::string &s = syms[ i ];
+        const auto &elem = PeriodicTable::Instance().Get( s );
+        const int desired = desiredElectronsForUI( s );
+        const int lone = std::max( 0, desired - 2 * bondSum[ i ] );
+        const int owned = bondSum[ i ] + lone;
+        const int fc = elem.valenceElectrons - owned;
+        d.absFormalCharge += std::abs( fc );
+
+        if (elem.atomicNumber <= 10)
+        {
+            const int tgt = (s == "H") ? 2 : 8;
+            d.octetPenalty += std::abs( owned - tgt );
+        }
+
+        const int enScaled = int( elem.electronegativity * 10.0f );
+        if (fc < 0) d.chargePlacementPenalty += std::max( 0, 32 - enScaled );
+        if (fc > 0) d.chargePlacementPenalty += std::max( 0, enScaled - 20 );
+    }
+
+    return d;
+}
+
 
 static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
     AtomSystem &atoms = *ctx.atoms;
@@ -294,6 +402,17 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
     static float topK = 6; if (topK < 1) topK = 1; if (topK > 36) topK = 36;
     CustomMenu::CustomSliderFloat( "Top K", ImGuiDataType_Float, &topK, 1, 6, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 220 );
 
+    static int searchLevel = (int)Resonance::SearchCaps::Balanced;
+    static float maxNodes = 75000.0f;
+    static float maxStructs = 192.0f;
+    ImGui::Text( "Resonance Search" );
+    ImGui::Spacing();
+    ImGui::RadioButton( "Fast", &searchLevel, (int)Resonance::SearchCaps::Fast ); ImGui::SameLine();
+    ImGui::RadioButton( "Balanced", &searchLevel, (int)Resonance::SearchCaps::Balanced ); ImGui::SameLine();
+    ImGui::RadioButton( "Exhaustive", &searchLevel, (int)Resonance::SearchCaps::Exhaustive );
+    CustomMenu::CustomSliderFloat( "Max nodes", ImGuiDataType_Float, &maxNodes, 10000, 300000, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 240 );
+    CustomMenu::CustomSliderFloat( "Max structures", ImGuiDataType_Float, &maxStructs, 32, 1024, "%.0f", IM_COL32( 76, 152, 220, 255 ), ImGuiSliderFlags_None, 240 );
+
     static float netCharge = 0; 
     if (ctx.currentPrebuiltAtom.size() && ImGui::IsWindowAppearing())
     {
@@ -313,6 +432,9 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
 
     static std::string cachedKey;
     static std::vector<std::vector<std::tuple<int, int, int>>> cached;
+    static int lastNodesVisited = 0;
+    static int lastGeneratedCount = 0;
+    static int selectedStructure = 0;
 
     auto sig = [&]( const std::vector<std::string> &S ) {
         std::string k; k.reserve( S.size() * 3 );
@@ -337,17 +459,29 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
         cachedKey.clear();
     }
 
-    const std::string key = symsSig + "|Q=" + std::to_string( netCharge );
+    const std::string key = symsSig + "|Q=" + std::to_string( netCharge )
+        + "|L=" + std::to_string( searchLevel )
+        + "|N=" + std::to_string( (int)maxNodes )
+        + "|S=" + std::to_string( (int)maxStructs );
     bool doGen = (key != cachedKey) || ImGui::Button( "Generate / Refresh" );
     if (doGen)
     {
         cachedKey = key;
         cached.clear();
+        selectedStructure = 0;
         try
         {
             Resonance::Generator gen( syms, netCharge );
+            Resonance::SearchCaps caps;
+            caps.level = (Resonance::SearchCaps::Level)searchLevel;
+            caps.maxNodes = (int)maxNodes;
+            caps.maxStructures = (int)maxStructs;
+            gen.setSearchCaps( caps );
+
             auto allOrig = gen.generateStructuresOriginal();
             cached = allOrig;
+            lastNodesVisited = gen.nodesVisited();
+            lastGeneratedCount = (int)allOrig.size();
 
             auto Canonize = []( const std::vector<std::tuple<int, int, int>> &bonds ) {
                 std::vector<std::tuple<int, int, int>> v; v.reserve( bonds.size() );
@@ -374,6 +508,8 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
         }
     }
 
+    ImGui::Text( "Generated: %d  |  Search nodes: %d", lastGeneratedCount, lastNodesVisited );
+
     if (cached.empty())
     {
         ImGui::TextDisabled( "No valid resonance structures for this molecule/charge." );
@@ -394,12 +530,35 @@ static void ShowResonanceTab( InputContext &ctx, float CARD_W ) {
             ImVec2 cell = ImVec2( (CARD_W - 24.0f) / cols, (CARD_W - 24.0f) / cols );
             ImGui::BeginChild( "mini", cell, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse );
             DrawLewisMini( syms, cached[ i ], ImVec2( cell.x - 8.0f, cell.y - 28.0f ) );
-            ImGui::Text( "%d", i + 1 );
+            if (i == selectedStructure) ImGui::TextColored( ImVec4( 0.45f, 0.95f, 0.75f, 1.0f ), "#%d", i + 1 );
+            else ImGui::Text( "%d", i + 1 );
             ImGui::EndChild();
-            if (ImGui::IsItemClicked()) atoms.build( syms, cached[ i ] );
+            if (ImGui::IsItemClicked())
+            {
+                selectedStructure = i;
+                atoms.build( syms, cached[ i ] );
+            }
             ImGui::PopID();
         }
         ImGui::EndTable();
+    }
+
+    if (!cached.empty())
+    {
+        selectedStructure = std::clamp( selectedStructure, 0, (int)cached.size() - 1 );
+        ResonanceDiagnostics rd = AnalyzeResonanceStructure( syms, cached[ selectedStructure ] );
+        ImGui::Separator();
+        ImGui::Text( "Selected structure: #%d", selectedStructure + 1 );
+        if (ImGui::BeginTable( "res_diag_table", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg ))
+        {
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "|Formal charge| sum" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", rd.absFormalCharge );
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Components (heavy)" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d (%d)", rd.components, rd.heavyComponents );
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Heavy ring count" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", rd.heavyRings );
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Octet penalty" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", rd.octetPenalty );
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Charge placement penalty" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", rd.chargePlacementPenalty );
+            ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Multiple-bond penalty" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", rd.multibondPenalty );
+            ImGui::EndTable();
+        }
     }
 
     EndCenteredCard( card );
@@ -473,6 +632,9 @@ void ShowImGuiMenu( InputContext &ctx ) {
                 CustomMenu::CustomCheckbox( "Apply VSEPR Forces", &atoms.applyVESPR );
                 if (atoms.applyVESPR)
                     CustomMenu::CustomCheckbox( "Large-molecule VSEPR", &atoms.fastCorrection );
+                CustomMenu::CustomCheckbox( "Highlight Ring Bonds", &atoms.highlightRings );
+                if (atoms.highlightRings)
+                    CustomMenu::CustomCheckbox( "Highlight Aromatic Candidates", &atoms.highlightAromaticCandidates );
                 EndCenteredCard( card );
             }
 
@@ -587,6 +749,7 @@ void ShowImGuiMenu( InputContext &ctx ) {
 
 void ShowStatsOverlay( InputContext &ctx, float dipole, const std::string &forcesCSV ) {
     AtomSystem &atoms = *ctx.atoms;
+    AtomSystem::MoleculeAnalysis analysis = atoms.analyzeMolecule();
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
         | ImGuiWindowFlags_AlwaysAutoResize
@@ -607,6 +770,7 @@ void ShowStatsOverlay( InputContext &ctx, float dipole, const std::string &force
     ImGui::Text( "Forces: %s", forces.c_str() );
     ImGui::Text( "Dipole Magnitude: %.4f", dipole );
     ImGui::Text( "Adjustment Magnitude: %.3f", atoms.latestCorrectionStrength );
+    ImGui::Text( "Angle RMS Deviation: %.2f°", analysis.angleRmsDeviation );
 
     float stability = glm::clamp( 1.f - 0.5f * atoms.latestCorrectionStrength, 0.f, 1.f );
     ImGui::Text( "Simulation Stability: %.0f%%", stability * 100.f );
@@ -615,6 +779,20 @@ void ShowStatsOverlay( InputContext &ctx, float dipole, const std::string &force
     ImGui::Separator();
     ImGui::TextDisabled( "WASD move | TAB for edit mode" );
 
+    ImGui::End();
+
+    ImGui::SetNextWindowPos( ImVec2( 10, 210 ), ImGuiCond_Always );
+    ImGui::Begin( "Molecule Analysis", nullptr, flags );
+    if (ImGui::BeginTable( "analysis_table", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg ))
+    {
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Atoms (Heavy)" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d (%d)", analysis.atomCount, analysis.heavyAtomCount );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Bonds" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", analysis.bondCount );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Components" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d (heavy %d)", analysis.components, analysis.heavyComponents );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Rings" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d (heavy %d)", analysis.ringCount, analysis.heavyRingCount );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Aromatic candidates" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%d", analysis.aromaticRingCandidates );
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex( 0 ); ImGui::TextUnformatted( "Average bond order" ); ImGui::TableSetColumnIndex( 1 ); ImGui::Text( "%.2f", analysis.averageBondOrder );
+        ImGui::EndTable();
+    }
     ImGui::End();
 
     ImGui::SetNextWindowPos( ImVec2( 280, 10 ), ImGuiCond_Always ); 

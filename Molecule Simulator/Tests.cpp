@@ -107,6 +107,22 @@ return dbl == 3 && sing == 9;
         return cnt == 6;
     },
     "6 S-F bonds"},
+
+{"Cyclohexane ring candidate (C6H12)", "C6H12",
+    []( const AtomSystem &sys )
+    {
+        auto a = sys.analyzeMolecule();
+        return a.heavyRingCount >= 1;
+    },
+    "at least one heavy-atom ring"},
+
+{"Pyridine-like aromatic candidate (C5H5N)", "C5H5N",
+    []( const AtomSystem &sys )
+    {
+        auto a = sys.analyzeMolecule();
+        return a.aromaticRingCandidates >= 1;
+    },
+    "at least one aromatic ring candidate"},
     };
 
     for (const auto &test : tests)

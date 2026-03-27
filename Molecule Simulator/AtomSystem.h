@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <tuple>
 #include <string>
 #include "Atom.h"
@@ -12,6 +13,20 @@
 class AtomSystem
 {
 public:
+    struct MoleculeAnalysis
+    {
+        int atomCount = 0;
+        int heavyAtomCount = 0;
+        int bondCount = 0;
+        int components = 0;
+        int heavyComponents = 0;
+        int ringCount = 0;
+        int heavyRingCount = 0;
+        int aromaticRingCandidates = 0;
+        float averageBondOrder = 0.0f;
+        float angleRmsDeviation = 0.0f;
+    };
+
     AtomSystem( unsigned maxAtoms, TextRenderer &tr );
 
     void update( float dt );
@@ -39,6 +54,7 @@ public:
     void computeLonePairDots();
 
     bool hasHyrdogenBonds();
+    MoleculeAnalysis analyzeMolecule() const;
 
     void drawTooltip( const Atom &at, int w, int h ) const;
 
@@ -85,6 +101,9 @@ public:
     bool hasDDI = false;
     bool hasHB = false;
 
+    bool highlightRings = true;
+    bool highlightAromaticCandidates = true;
+
     void clear();
 
 
@@ -93,7 +112,7 @@ private:
     void applyVSEPRForces( float dt );
     void applyVSEPRAngleFast( float dt );
     void renderBondAngles( int w, int h, const Camera &camera, const Atom *hovered );
-    float getIdealBondAngle( const Atom &a );
+    float getIdealBondAngle( const Atom &a ) const;
     void  computeLonePairPositions( std::unordered_map<Atom *, std::vector<glm::vec3>> &out );
     std::string determineGeometry( const Atom & ) const;
 

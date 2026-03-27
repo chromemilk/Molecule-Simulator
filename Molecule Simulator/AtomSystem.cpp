@@ -13,6 +13,14 @@
 #include <glm/gtx/quaternion.hpp>
 #include "Resonance.h" 
 #include <imgui.h>
+#include <algorithm>
+#include <queue>
+#include <cmath>
+#include <functional>
+
+static long long edgeKey( int a, int b );
+static std::unordered_set<long long> findRingEdges( const std::vector<Atom> &atoms, const std::vector<Bond> &bonds );
+static std::unordered_set<long long> findAromaticCandidateEdges( const std::vector<Atom> &atoms, const std::vector<Bond> &bonds );
 
 
 
@@ -96,6 +104,27 @@ void AtomSystem::render( int w, int h, Atom *selectedAtom, Atom *hoveredAtom, At
     {
         // Render the bonds 
         b.render( w, h );
+    }
+
+    if (highlightRings && !atoms.empty() && !bonds.empty())
+    {
+        auto idxOf = [&]( const Atom *p ) { return int( p - &atoms[ 0 ] ); };
+        const auto ringEdges = findRingEdges( atoms, bonds );
+        const auto aromaticEdges = highlightAromaticCandidates
+            ? findAromaticCandidateEdges( atoms, bonds )
+            : std::unordered_set<long long>{};
+
+        for (const Bond &b : bonds)
+        {
+            const int ia = idxOf( b.atomA );
+            const int ib = idxOf( b.atomB );
+            const long long ek = edgeKey( ia, ib );
+            if (!ringEdges.count( ek )) continue;
+
+            const bool isAromatic = aromaticEdges.count( ek ) > 0;
+            const glm::vec3 col = isAromatic ? glm::vec3( 0.95f, 0.45f, 0.95f ) : glm::vec3( 0.25f, 0.92f, 0.95f );
+            Renderer::DrawBondCylinder( b.atomA->position, b.atomB->position, 0.13f, w, h, col );
+        }
     }
 
     for (Atom &a : atoms)
@@ -244,6 +273,150 @@ static glm::vec3 safeNormalize( const glm::vec3 &v, float eps = 1e-6f ) {
     return (len > eps) ? v / len : glm::vec3( 0.0f );
 }
 
+static long long edgeKey( int a, int b ) {
+    if (a > b) std::swap( a, b );
+    return (static_cast<long long>( a ) << 32) | static_cast<unsigned int>( b );
+}
+
+static std::unordered_set<long long> findRingEdges( const std::vector<Atom> &atoms, const std::vector<Bond> &bonds ) {
+    std::unordered_set<long long> ringEdges;
+    if (atoms.empty() || bonds.empty()) return ringEdges;
+
+    auto idxOf = [&]( const Atom *p ) { return int( p - &atoms[ 0 ] ); };
+    const int n = (int)atoms.size();
+
+    std::vector<std::vector<std::pair<int, int>>> adj( n ); // (neighbor, edgeIndex)
+    for (int ei = 0; ei < (int)bonds.size(); ++ei)
+    {
+        int a = idxOf( bonds[ ei ].atomA );
+        int b = idxOf( bonds[ ei ].atomB );
+        adj[ a ].push_back( { b, ei } );
+        adj[ b ].push_back( { a, ei } );
+    }
+
+    std::vector<int> tin( n, -1 ), low( n, -1 );
+    std::vector<char> isBridge( bonds.size(), 0 );
+    int timer = 0;
+
+    std::function<void( int, int )> dfs = [&]( int u, int pe ) {
+        tin[ u ] = low[ u ] = timer++;
+        for (auto [v, ei] : adj[ u ])
+        {
+            if (ei == pe) continue;
+            if (tin[ v ] != -1)
+            {
+                low[ u ] = std::min( low[ u ], tin[ v ] );
+            }
+            else
+            {
+                dfs( v, ei );
+                low[ u ] = std::min( low[ u ], low[ v ] );
+                if (low[ v ] > tin[ u ]) isBridge[ ei ] = 1;
+            }
+        }
+        };
+
+    for (int i = 0; i < n; ++i)
+        if (tin[ i ] == -1)
+            dfs( i, -1 );
+
+    for (int ei = 0; ei < (int)bonds.size(); ++ei)
+    {
+        if (isBridge[ ei ]) continue;
+        int a = idxOf( bonds[ ei ].atomA );
+        int b = idxOf( bonds[ ei ].atomB );
+        ringEdges.insert( edgeKey( a, b ) );
+    }
+    return ringEdges;
+}
+
+static std::unordered_set<long long> findAromaticCandidateEdges( const std::vector<Atom> &atoms, const std::vector<Bond> &bonds ) {
+    std::unordered_set<long long> aromatic;
+    if (atoms.empty() || bonds.empty()) return aromatic;
+
+    auto idxOf = [&]( const Atom *p ) { return int( p - &atoms[ 0 ] ); };
+    const int n = (int)atoms.size();
+
+    std::vector<char> isHeavy( n, 0 );
+    for (int i = 0; i < n; ++i)
+        isHeavy[ i ] = (atoms[ i ].type != "H" && atoms[ i ].type != "LP");
+
+    std::vector<std::vector<std::pair<int, int>>> adj( n ); // (neighbor, order)
+    for (const Bond &b : bonds)
+    {
+        int a = idxOf( b.atomA );
+        int c = idxOf( b.atomB );
+        int o = b.bondOrder();
+        if (!isHeavy[ a ] || !isHeavy[ c ]) continue;
+        adj[ a ].push_back( { c, o } );
+        adj[ c ].push_back( { a, o } );
+    }
+
+    std::vector<int> comp( n, -1 );
+    int cid = 0;
+    for (int s = 0; s < n; ++s)
+    {
+        if (!isHeavy[ s ] || comp[ s ] >= 0) continue;
+        std::queue<int> q;
+        q.push( s );
+        comp[ s ] = cid;
+        while (!q.empty())
+        {
+            int u = q.front(); q.pop();
+            for (auto [v, _] : adj[ u ]) if (comp[ v ] < 0)
+            {
+                comp[ v ] = cid;
+                q.push( v );
+            }
+        }
+        ++cid;
+    }
+
+    for (int c = 0; c < cid; ++c)
+    {
+        std::vector<int> verts;
+        for (int i = 0; i < n; ++i) if (comp[ i ] == c) verts.push_back( i );
+        if (verts.size() < 5) continue;
+
+        int edgeCount = 0;
+        bool allDeg2 = true;
+        int piElectrons = 0;
+
+        for (int u : verts)
+        {
+            int deg = 0;
+            bool hasDouble = false;
+            for (auto [v, o] : adj[ u ])
+            {
+                if (comp[ v ] != c) continue;
+                ++deg;
+                if (u < v)
+                {
+                    ++edgeCount;
+                    if (o >= 2) piElectrons += 2;
+                }
+                if (o >= 2) hasDouble = true;
+            }
+            allDeg2 &= (deg == 2);
+            if (!hasDouble)
+            {
+                const std::string &s = atoms[ u ].type;
+                if ((s == "N" || s == "O" || s == "S" || s == "P") && atoms[ u ].lonePairs > 0)
+                    piElectrons += 2;
+            }
+        }
+
+        if (!allDeg2 || edgeCount != (int)verts.size()) continue;
+        if (!(piElectrons >= 2 && ((piElectrons - 2) % 4 == 0))) continue;
+
+        for (int u : verts)
+            for (auto [v, _] : adj[ u ])
+                if (comp[ v ] == c && u < v)
+                    aromatic.insert( edgeKey( u, v ) );
+    }
+    return aromatic;
+}
+
 
 void AtomSystem::applyVSEPRForces( float dt ) {
     float k = correctionProportion;
@@ -321,7 +494,7 @@ void AtomSystem::applyVSEPRForces( float dt ) {
 
 struct Dir
 {
-    glm::vec3 v; float r; int idx; bool movable;
+    glm::vec3 v; float r; int idx; bool movable; float weight;
 };
 
 
@@ -344,7 +517,7 @@ static void addVirtualLonePairs( const Atom &C, std::vector<Dir> &out ) {
         cand.erase( best );
     }
     for (int i = 0; i < need && i < (int)cand.size(); ++i)
-        out.push_back( { cand[ i ], 1.0f, -1, false } );
+        out.push_back( { cand[ i ], 1.0f, -1, false, 1.35f } );
 }
 
 
@@ -353,8 +526,8 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
     const float maxStep = glm::radians( 6.0f );
     const float velocityDamp = 0.98f;
 
-    auto isHeavy = []( const Atom *a ) {
-        return a && a->type != "H" && a->type != "LP";
+    auto isDomain = []( const Atom *a ) {
+        return a && a->type != "LP";
         };
 
     std::vector<glm::vec3> torque( atoms.size(), glm::vec3( 0 ) );
@@ -366,11 +539,12 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
 
         for (Atom *B : C.bondedAtoms)
         {
-            if (!isHeavy( B )) continue;                   
+            if (!isDomain( B )) continue;
             glm::vec3 d = B->position - C.position;
             float r = glm::length( d ); if (r < 1e-4f) r = 1e-4f;
             int idx = int( &B[ 0 ] - &atoms[ 0 ] );
-            dom.push_back( { d / r, r, idx, !B->fixed } );
+            float w = (B->type == "H") ? 0.55f : 1.0f;
+            dom.push_back( { d / r, r, idx, !B->fixed, w } );
         }
 
         addVirtualLonePairs( C,  dom ); // or copy the helper’s push_back logic
@@ -386,7 +560,8 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
             {
                 glm::vec3 diff = dom[ i ].v - dom[ j ].v;
                 float d2 = glm::dot( diff, diff ) + 1e-4f;
-                glm::vec3 f = kRep * diff / (d2 * std::sqrt( d2 ));  // inverse-cube, softened
+                float w = dom[ i ].weight * dom[ j ].weight;
+                glm::vec3 f = kRep * w * diff / (d2 * std::sqrt( d2 ));  // inverse-cube, softened
 
                 if (dom[ i ].movable) torque[ dom[ i ].idx ] += f;
                 if (dom[ j ].movable) torque[ dom[ j ].idx ] -= f;
@@ -399,7 +574,7 @@ void AtomSystem::applyVSEPRAngleFast( float dt ) {
         Atom *best = nullptr; int bestOrder = -1;
         for (Atom *N : B.bondedAtoms)
         {
-            if (!isHeavy( N )) continue;                    
+            if (!isDomain( N ) || N->type == "H") continue;
             int order = 0;
             for (const Bond &bd : bonds)
             {
@@ -511,9 +686,17 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight, const Came
     glm::mat4 view = camera.GetViewMatrix();
     glm::vec4 viewport( 0.f, 0.f, float( windowWidth ), float( windowHeight ) );
 
-    float bestDeg = 1e9f;
-    Atom *Astar = nullptr, *Bstar = nullptr;
-    glm::vec3 vA{}, vB{};
+    struct AngleSample
+    {
+        Atom *A{};
+        Atom *B{};
+        float deg{};
+        float ideal{};
+    };
+
+    std::vector<AngleSample> samples;
+    samples.reserve( nbrs.size() * nbrs.size() );
+
     for (size_t i = 0; i < nbrs.size(); ++i)
     {
         for (size_t j = i + 1; j < nbrs.size(); ++j)
@@ -522,16 +705,17 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight, const Came
             glm::vec3 b = safeNorm( nbrs[ j ]->position - center->position );
             float c = glm::clamp( glm::dot( a, b ), -1.0f, 1.0f );
             float deg = glm::degrees( std::acos( c ) );
-            if (deg < bestDeg)
-            {
-                bestDeg = deg; Astar = nbrs[ i ]; Bstar = nbrs[ j ]; vA = a; vB = b;
-            }
+            samples.push_back( { nbrs[ i ], nbrs[ j ], deg, idealAnglePair( *center, a, b ) } );
         }
     }
-    if (!Astar || !Bstar) return;
+    if (samples.empty()) return;
 
-    float ideal = idealAnglePair( *center, vA, vB );
+    std::sort( samples.begin(), samples.end(), []( const AngleSample &l, const AngleSample &r ) {
+        return std::fabs( l.deg - l.ideal ) > std::fabs( r.deg - r.ideal );
+        } );
 
+    glm::vec3 vA = safeNorm( samples.front().A->position - center->position );
+    glm::vec3 vB = safeNorm( samples.front().B->position - center->position );
     glm::vec3 bis = safeNorm( vA + vB );
     if (glm::length2( bis ) < 1e-8f)
     {
@@ -545,8 +729,30 @@ void AtomSystem::renderBondAngles( int windowWidth, int windowHeight, const Came
     if (win.z < 0.0f || win.z > 1.0f) return;
 
     char buf[ 96 ];
-    std::snprintf( buf, sizeof( buf ), "[ANGLE] %.0f | (Ideal %.0f)", bestDeg, ideal );
+    std::snprintf( buf, sizeof( buf ), "[ANGLE] %.1f | (Ideal %.1f)", samples.front().deg, samples.front().ideal );
     textRenderer.DrawScreenText( buf, win.x, windowHeight - win.y, windowWidth, windowHeight );
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
+        | ImGuiWindowFlags_AlwaysAutoResize
+        | ImGuiWindowFlags_NoSavedSettings;
+    ImGui::SetNextWindowPos( ImVec2( 280.0f, 185.0f ), ImGuiCond_Always );
+    if (ImGui::Begin( "Bond Angle Inspector", nullptr, flags ))
+    {
+        ImGui::Text( "Center: %s", center->type.c_str() );
+        ImGui::Separator();
+        const int maxRows = std::min<int>( 8, (int)samples.size() );
+        for (int i = 0; i < maxRows; ++i)
+        {
+            const auto &s = samples[ i ];
+            const float err = std::fabs( s.deg - s.ideal );
+            ImVec4 col = (err < 3.0f)
+                ? ImVec4( 0.55f, 0.95f, 0.55f, 1.0f )
+                : (err < 10.0f ? ImVec4( 0.95f, 0.85f, 0.45f, 1.0f ) : ImVec4( 0.95f, 0.45f, 0.45f, 1.0f ));
+            ImGui::TextColored( col, "%s-%s: %.1f° (ideal %.1f°)",
+                s.A->type.c_str(), s.B->type.c_str(), s.deg, s.ideal );
+        }
+    }
+    ImGui::End();
 }
 
 
@@ -726,7 +932,7 @@ void AtomSystem::computeLonePairPositions(
 }
 
 
-float AtomSystem::getIdealBondAngle( const Atom &atom ) {
+float AtomSystem::getIdealBondAngle( const Atom &atom ) const {
     auto &pt = PeriodicTable::Instance();
     int bonded = (int)atom.bondedAtoms.size();
     int lp = atom.lonePairs;
@@ -1001,6 +1207,33 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
         }
     }
 
+    float avgAngle = 0.0f;
+    float minAngle = 180.0f;
+    float maxAngle = 0.0f;
+    int angleCount = 0;
+    const auto &nb = at.bondedAtoms;
+    for (size_t i = 0; i < nb.size(); ++i)
+    {
+        for (size_t j = i + 1; j < nb.size(); ++j)
+        {
+            glm::vec3 a = nb[ i ]->position - at.position;
+            glm::vec3 b = nb[ j ]->position - at.position;
+            if (glm::length2( a ) < 1e-8f || glm::length2( b ) < 1e-8f) continue;
+            a = glm::normalize( a );
+            b = glm::normalize( b );
+            const float deg = glm::degrees( std::acos( glm::clamp( glm::dot( a, b ), -1.0f, 1.0f ) ) );
+            avgAngle += deg;
+            minAngle = std::min( minAngle, deg );
+            maxAngle = std::max( maxAngle, deg );
+            ++angleCount;
+        }
+    }
+    if (angleCount > 0) avgAngle /= float( angleCount );
+    const float ideal = getIdealBondAngle( at );
+    const float maxDeviation = (angleCount > 0)
+        ? std::max( std::fabs( minAngle - ideal ), std::fabs( maxAngle - ideal ) )
+        : 0.0f;
+
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse
         | ImGuiWindowFlags_AlwaysAutoResize
         | ImGuiWindowFlags_NoSavedSettings
@@ -1021,6 +1254,12 @@ void AtomSystem::drawTooltip( const Atom &at, int w, int h ) const {
         ImGui::Text( "Dipole: %.3f", dipole );
 
         ImGui::Text( "Lone Pairs: %d", (int)at.lonePairs );
+
+        if (angleCount > 0)
+        {
+            ImGui::Text( "Angles avg/min/max: %.1f / %.1f / %.1f", avgAngle, minAngle, maxAngle );
+            ImGui::Text( "Ideal: %.1f  Max dev: %.1f", ideal, maxDeviation );
+        }
 
         ImGui::Separator();
         ImGui::Text( "Bonds  S:%d  D:%d  T:%d  (s:%d, pi:%d)",
@@ -1082,6 +1321,184 @@ float AtomSystem::idealAnglePair( const Atom &C, const glm::vec3 &vA, const glm:
         return 90.f;
     }
     return getIdealBondAngle( C );
+}
+
+AtomSystem::MoleculeAnalysis AtomSystem::analyzeMolecule() const {
+    MoleculeAnalysis out;
+    out.atomCount = (int)atoms.size();
+    out.bondCount = (int)bonds.size();
+
+    if (atoms.empty()) return out;
+
+    auto idxOf = [&]( const Atom *p ) {
+        return int( p - &atoms[ 0 ] );
+        };
+
+    std::vector<char> isHeavy( atoms.size(), 0 );
+    for (size_t i = 0; i < atoms.size(); ++i)
+    {
+        if (atoms[ i ].type != "H" && atoms[ i ].type != "LP")
+        {
+            isHeavy[ i ] = 1;
+            ++out.heavyAtomCount;
+        }
+    }
+
+    std::vector<std::vector<std::pair<int, int>>> adj( atoms.size() ); // (neighbor, order)
+    int heavyEdges = 0;
+    double bondOrderSum = 0.0;
+
+    for (const Bond &b : bonds)
+    {
+        const int ia = idxOf( b.atomA );
+        const int ib = idxOf( b.atomB );
+        const int order = b.bondOrder();
+        adj[ ia ].push_back( { ib, order } );
+        adj[ ib ].push_back( { ia, order } );
+        bondOrderSum += order;
+        if (isHeavy[ ia ] && isHeavy[ ib ]) ++heavyEdges;
+    }
+
+    out.averageBondOrder = bonds.empty() ? 0.0f : float( bondOrderSum / double( bonds.size() ) );
+
+    auto countComponents = [&]( bool heavyOnly ) {
+        std::vector<char> seen( atoms.size(), 0 );
+        int comps = 0;
+        for (size_t s = 0; s < atoms.size(); ++s)
+        {
+            if (seen[ s ]) continue;
+            if (heavyOnly && !isHeavy[ s ]) continue;
+            if (adj[ s ].empty() && (!heavyOnly || isHeavy[ s ]))
+            {
+                seen[ s ] = 1;
+                ++comps;
+                continue;
+            }
+
+            std::queue<int> q;
+            q.push( (int)s );
+            seen[ s ] = 1;
+            ++comps;
+
+            while (!q.empty())
+            {
+                int u = q.front(); q.pop();
+                for (auto [v, _] : adj[ u ])
+                {
+                    if (heavyOnly && !isHeavy[ v ]) continue;
+                    if (!seen[ v ])
+                    {
+                        seen[ v ] = 1;
+                        q.push( v );
+                    }
+                }
+            }
+        }
+        return comps;
+        };
+
+    out.components = countComponents( false );
+    out.heavyComponents = (out.heavyAtomCount > 0) ? countComponents( true ) : 0;
+
+    out.ringCount = std::max( 0, out.bondCount - out.atomCount + out.components );
+    out.heavyRingCount = std::max( 0, heavyEdges - out.heavyAtomCount + out.heavyComponents );
+
+    // Aromatic candidate heuristic on heavy graph components
+    if (out.heavyAtomCount > 0)
+    {
+        std::vector<int> heavyIdx;
+        heavyIdx.reserve( out.heavyAtomCount );
+        for (size_t i = 0; i < atoms.size(); ++i) if (isHeavy[ i ]) heavyIdx.push_back( (int)i );
+
+        std::vector<int> compId( atoms.size(), -1 );
+        int cid = 0;
+        for (int s : heavyIdx)
+        {
+            if (compId[ s ] >= 0) continue;
+            std::queue<int> q;
+            q.push( s );
+            compId[ s ] = cid;
+            while (!q.empty())
+            {
+                int u = q.front(); q.pop();
+                for (auto [v, _] : adj[ u ])
+                {
+                    if (!isHeavy[ v ]) continue;
+                    if (compId[ v ] < 0)
+                    {
+                        compId[ v ] = cid;
+                        q.push( v );
+                    }
+                }
+            }
+            ++cid;
+        }
+
+        for (int c = 0; c < cid; ++c)
+        {
+            std::vector<int> verts;
+            for (int i : heavyIdx) if (compId[ i ] == c) verts.push_back( i );
+            if (verts.size() < 5) continue;
+
+            int edgeCount = 0;
+            bool allDeg2 = true;
+            int piElectrons = 0;
+
+            for (int u : verts)
+            {
+                int deg = 0;
+                bool hasDouble = false;
+                for (auto [v, o] : adj[ u ])
+                {
+                    if (!isHeavy[ v ] || compId[ v ] != c) continue;
+                    ++deg;
+                    if (u < v) ++edgeCount;
+                    if (o >= 2)
+                    {
+                        hasDouble = true;
+                        if (u < v) piElectrons += 2;
+                    }
+                }
+                allDeg2 &= (deg == 2);
+                if (!hasDouble)
+                {
+                    const std::string &s = atoms[ u ].type;
+                    if ((s == "N" || s == "O" || s == "S" || s == "P") && atoms[ u ].lonePairs > 0)
+                        piElectrons += 2;
+                }
+            }
+
+            if (!allDeg2 || edgeCount != (int)verts.size()) continue;
+            if (piElectrons >= 2 && ((piElectrons - 2) % 4 == 0))
+                ++out.aromaticRingCandidates;
+        }
+    }
+
+    double sqErr = 0.0;
+    int nAngles = 0;
+    for (const Atom &c : atoms)
+    {
+        if (c.bondedAtoms.size() < 2) continue;
+        const float ideal = getIdealBondAngle( c );
+        for (size_t i = 0; i < c.bondedAtoms.size(); ++i)
+        {
+            for (size_t j = i + 1; j < c.bondedAtoms.size(); ++j)
+            {
+                glm::vec3 a = c.bondedAtoms[ i ]->position - c.position;
+                glm::vec3 b = c.bondedAtoms[ j ]->position - c.position;
+                if (glm::length2( a ) < 1e-8f || glm::length2( b ) < 1e-8f) continue;
+                a = glm::normalize( a );
+                b = glm::normalize( b );
+                const float deg = glm::degrees( std::acos( glm::clamp( glm::dot( a, b ), -1.0f, 1.0f ) ) );
+                const float d = deg - ideal;
+                sqErr += double( d ) * double( d );
+                ++nAngles;
+            }
+        }
+    }
+    out.angleRmsDeviation = (nAngles > 0) ? float( std::sqrt( sqErr / nAngles ) ) : 0.0f;
+
+    return out;
 }
 
 bool AtomSystem::hasHyrdogenBonds() {
