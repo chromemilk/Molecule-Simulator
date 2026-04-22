@@ -136,30 +136,6 @@ A comprehensive set of automated tests validates parsing, resonance generation, 
 * **Resonance Validation**: Ensure `Resonance::Generator` produces the lowest-formal-charge structure for cases like NO₃⁻, benzene, and complex ions.
 * **Atom System Checks**: Build molecules with `AtomSystem::build` and confirm correct atom counts and bond orders via lambdas in each `TestCase`.
 
-### Running Tests
-
-1. **Enable Testing in CMake**:
-
-   ```cmake
-   # In CMakeLists.txt
-   enable_testing()
-   add_executable(MoleculeSimulatorTests Tests.cpp Parser.cpp Resonance.cpp AtomSystem.cpp Atom.cpp Bond.cpp main.cpp)
-   target_link_libraries(MoleculeSimulatorTests PRIVATE GTest::GTest GTest::Main)
-   add_test(NAME MolSimTests COMMAND MoleculeSimulatorTests)
-   ```
-2. **Build & Execute**:
-
-   ```bash
-   mkdir build && cd build
-   cmake -DBUILD_TESTS=ON ..
-   make -j$(nproc)
-   ctest --verbose
-   ```
-3. **Interpret Results**:
-
-   * Each test prints the molecule name, expected vs. actual composition or bond count, and PASS/FAIL.
-   * To add new cases, edit `Tests.cpp`, append to the `tests` vector with a lambda validator and expected string.
-
 Ensure `glfw`, `glad`, and `glm` headers are accessible to the test target for linking and compilation.
 
 * To enable GPU raytracing (requires OpenGL 4.6), edit `main.cpp` and set `useRT = true`.
